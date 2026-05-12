@@ -15,21 +15,21 @@ Create `google-adk-agent/agent_system.py` (currently missing — this is the **D
 
 ```
 google-adk-agent/
-  agent_system.py                 Top-level: defines the 4 agents, exports them under both new and legacy names
-  contracts.py                    Pydantic models for SkepticReport, MunshiReport, HypeReport, FinalReport
-  agents/
-    skeptic_agent.py              System prompt + tool wiring for Skeptic
-    munshi_agent.py               System prompt + tool wiring for Munshi
-    hype_agent.py                 System prompt + tool wiring for Hype
-    cvo_agent.py                  System prompt + tool wiring for CVO (no tools)
-  tools/
-    web_search.py                 Skeptic + Munshi tool
-    calculate.py                  Munshi tool
-  .env                            GOOGLE_API_KEY, ALLOWED_ORIGINS
+  agent_system.py                 Top-level: imports the 4 agents, exports under new + legacy names, helpers
+  contracts.py                    Pydantic models — SkepticReport, MunshiReport, HypeReport, FinalReport
+  skeptic_agent.py                Skeptic Agent + system prompt + tool wiring
+  munshi_agent.py                 Munshi Agent + system prompt + tool wiring
+  hype_agent.py                   Hype Agent + system prompt + tool wiring
+  cvo_agent.py                    CVO Agent + system prompt (no tools)
+  tools.py                        web_search + calculate
+  .env                            GOOGLE_API_KEY (gitignored)
+  .env.example                    Template, checked in
 
 api/services/
   google_adk_runner.py            (existing) — imports agents from agent_system, runs the pipeline, emits SSE
 ```
+
+**Flat layout, not nested.** Python can't import the hyphenated directory `google-adk-agent` as a package, so `agent_system.py` does a `sys.path.insert(0, _HERE)` nudge to make sibling files importable as top-level modules.
 
 The runner at `api/services/google_adk_runner.py:118` already does the orchestration plumbing — keep it. Only the agent definitions and prompts change.
 

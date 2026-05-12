@@ -28,7 +28,7 @@ Originally proposed Flutter + Firebase in the planning doc — rejected on 2026-
 ### Single boundaries (one file = one side effect)
 - **All SSE consumption:** `frontend/lib/sse-client.ts`
 - **All `jspdf` calls:** `frontend/lib/share-card.ts` (Aura Card) and `frontend/lib/investor-report.ts` (full PDF)
-- **All agent prompts:** `google-adk-agent/agents/<name>.py` — one file per agent, prompt is the module's primary export
+- **All agent prompts:** `google-adk-agent/<name>_agent.py` — one file per agent, prompt is the module's primary export
 - **All agent contracts (JSON schemas):** `google-adk-agent/contracts.py` and mirrored in `frontend/lib/agent-types.ts`
 - **All Gemini calls:** behind `google-adk` agents — frontend never calls Gemini directly
 
@@ -66,15 +66,18 @@ api/                                FastAPI backend
   routers/run.py                    SSE endpoints
   services/google_adk_runner.py     Orchestrator (calls into google-adk-agent/)
 
-google-adk-agent/                   ADK agent definitions (to be created — Day 1)
-  agent_system.py                   Top-level pipeline wiring
-  agents/
-    skeptic_agent.py
-    munshi_agent.py
-    hype_agent.py
-    cvo_agent.py
-  contracts.py                      JSON schemas for agent I/O
-  tools/                            web_search, calculate, etc.
+google-adk-agent/                   ADK agent definitions (Day 1 — created)
+  agent_system.py                   Top-level: imports each agent, exports legacy + new aliases, helpers
+  skeptic_agent.py                  Skeptic agent definition + system prompt
+  munshi_agent.py                   Munshi agent definition + system prompt
+  hype_agent.py                     Hype agent definition + system prompt
+  cvo_agent.py                      CVO agent definition + system prompt
+  contracts.py                      Pydantic models — SkepticReport, MunshiReport, HypeReport, FinalReport
+  tools.py                          web_search + calculate functions
+  .env                              GOOGLE_API_KEY, ALLOWED_ORIGINS (gitignored)
+  .env.example                      Template, checked in
+
+Flat structure — no `agents/` or `tools/` subdirectories. The directory name uses a hyphen, which Python cannot import as a package, so `agent_system.py` does a `sys.path` nudge to allow sibling imports.
 
 frontend/                           Next.js 15
   app/
