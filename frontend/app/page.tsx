@@ -1,33 +1,50 @@
-import SdkCard from "@/components/SdkCard";
-import { sdkList } from "@/lib/sdk-data";
+import HeroCharacter from "@/components/launchpad/HeroCharacter";
+import LaunchpadCTA from "@/components/launchpad/LaunchpadCTA";
+import { COPY } from "@/lib/copy";
 
-export default function Home() {
+export default function Launchpad() {
   return (
-    <div className="max-w-6xl mx-auto px-6 py-16">
-      <div className="text-center mb-16">
-        <h1 className="text-4xl font-bold tracking-tight mb-4">
-          Multi-Agent SDK Comparison
+    <main className="relative min-h-screen overflow-hidden flex flex-col items-center justify-center px-6 py-12">
+      {/* Ambient neon backdrop */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(60% 50% at 30% 20%, rgba(59,130,246,0.18), transparent 70%), " +
+            "radial-gradient(50% 45% at 75% 80%, rgba(217,70,239,0.16), transparent 70%), " +
+            "radial-gradient(40% 40% at 50% 100%, rgba(34,197,94,0.14), transparent 70%)",
+        }}
+      />
+
+      <div className="relative z-10 w-full max-w-md text-center">
+        <HeroCharacter />
+
+        <h1 className="mt-8 text-3xl sm:text-4xl font-bold tracking-tight text-white">
+          {COPY.launchpad.headline}
         </h1>
-        <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-          Same 4-agent investment memo pipeline built with different SDKs.
-          Compare how Claude, OpenAI, and Google ADK handle tool use, handoffs, and orchestration.
+
+        <p className="mt-3 text-sm sm:text-base text-white/60 max-w-sm mx-auto">
+          {COPY.launchpad.tagline}
         </p>
-        <div className="flex items-center justify-center gap-2 mt-6 text-sm text-gray-500 flex-wrap">
-          <span className="px-2 py-1 rounded bg-gray-800 text-gray-300">Researcher</span>
-          <span>→</span>
-          <span className="px-2 py-1 rounded bg-gray-800 text-gray-300">Analyzer</span>
-          <span>→</span>
-          <span className="px-2 py-1 rounded bg-gray-800 text-gray-300">Writer</span>
-          <span>→</span>
-          <span className="px-2 py-1 rounded bg-gray-800 text-gray-300">QA/Review</span>
+
+        <div className="mt-10 flex flex-col gap-3 md:flex-row md:gap-4">
+          <div className="flex-1">
+            <LaunchpadCTA
+              label={COPY.launchpad.primaryCta}
+              href="/upload"
+              variant="primary"
+            />
+          </div>
+          <div className="flex-1">
+            <LaunchpadCTA
+              label={COPY.launchpad.secondaryCta}
+              href="/upload"
+              variant="secondary"
+            />
+          </div>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {sdkList.map((sdk) => (
-          <SdkCard key={sdk.slug} sdk={sdk} />
-        ))}
-      </div>
-    </div>
+    </main>
   );
 }
