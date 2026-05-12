@@ -1,241 +1,396 @@
+"""VibeInvest agent pipeline runner.
+
+Wires the four ADK agents (Skeptic → Munshi → Hype → CVO) into an async
+generator that yields VibeInvest SSE events. Each agent's free-text response
+is parsed against its Pydantic contract; on parse failure we retry once with
+a fix-it instruction, then emit `pipeline_error` and bail.
+
+# Event contract — mirror of frontend/lib/agent-types.ts
+- pipeline_start   { run_id, idea_text }
+- agent_start      { agent }
+- agent_text       { agent, delta }
+- tool_call        { agent, tool, args }
+- tool_result      { agent, tool, result }
+- agent_complete   { agent, report }       <-- structured (parsed Pydantic model)
+- agent_handoff    { from, to }
+- pipeline_complete { final_report }
+- pipeline_error   { agent?, error }
 """
-Google ADK Agent Pipeline Runner — async SSE streaming wrapper.
-Imports all agent logic from google-adk-agent/agent_system.py (single source of truth).
-"""
+from __future__ import annotations
 
 import asyncio
-import json
 import importlib.util
+import json
+import re
+import uuid
 from pathlib import Path
+from typing import Any, AsyncGenerator, Type
 
-# Import google-adk-agent/agent_system.py by absolute file path to avoid
-# collision with other agent_system.py files on sys.path.
-_goog_agent_file = Path(__file__).parent.parent.parent / "google-adk-agent" / "agent_system.py"
-_spec = importlib.util.spec_from_file_location("google_adk_agent_system", str(_goog_agent_file))
-_goog_mod = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_goog_mod)
+from pydantic import BaseModel, ValidationError
 
-researcher_agent = _goog_mod.researcher_agent
-analyzer_agent = _goog_mod.analyzer_agent
-writer_agent = _goog_mod.writer_agent
-qa_agent = _goog_mod.qa_agent
-run_single_agent = _goog_mod.run_single_agent
 
-# Load env with explicit path
-_env_path = str(Path(__file__).parent.parent.parent / "google-adk-agent" / ".env")
-_goog_mod.load_env(env_path=_env_path)
+# ── Load the agent system (hyphenated dir, so use spec_from_file_location) ──
+_AGENT_DIR = Path(__file__).parent.parent.parent / "google-adk-agent"
+
+_sys_spec = importlib.util.spec_from_file_location(
+    "google_adk_agent_system", str(_AGENT_DIR / "agent_system.py")
+)
+_sys_mod = importlib.util.module_from_spec(_sys_spec)
+_sys_spec.loader.exec_module(_sys_mod)
+
+skeptic_agent = _sys_mod.skeptic_agent
+munshi_agent = _sys_mod.munshi_agent
+hype_agent = _sys_mod.hype_agent
+cvo_agent = _sys_mod.cvo_agent
+
+# Legacy aliases (still exported for backward compat; not used in this runner)
+researcher_agent = _sys_mod.researcher_agent
+analyzer_agent = _sys_mod.analyzer_agent
+writer_agent = _sys_mod.writer_agent
+qa_agent = _sys_mod.qa_agent
+
+# Load env from the agent dir's .env
+_sys_mod.load_env(env_path=str(_AGENT_DIR / ".env"))
+
+# Load the Pydantic contracts the same way (sibling file to agent_system.py).
+_contracts_spec = importlib.util.spec_from_file_location(
+    "google_adk_contracts", str(_AGENT_DIR / "contracts.py")
+)
+_contracts_mod = importlib.util.module_from_spec(_contracts_spec)
+_contracts_spec.loader.exec_module(_contracts_mod)
+
+SkepticReport = _contracts_mod.SkepticReport
+MunshiReport = _contracts_mod.MunshiReport
+HypeReport = _contracts_mod.HypeReport
+FinalReport = _contracts_mod.FinalReport
+
+
+# ── JSON parsing helpers ────────────────────────────────────────────────────
+
+
+_JSON_FENCE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
+_FIRST_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
+
+
+def _extract_json(text: str) -> str | None:
+    """Pull a JSON object out of an agent's raw text response.
+
+    Agents are instructed to return strict JSON with no fences, but defensive
+    extraction handles the case where a fenced block sneaks in.
+    """
+    if not text:
+        return None
+    fenced = _JSON_FENCE.search(text)
+    if fenced:
+        return fenced.group(1)
+    obj = _FIRST_OBJECT.search(text)
+    if obj:
+        return obj.group(0)
+    return None
+
+
+def _parse(text: str, model: Type[BaseModel]) -> BaseModel | None:
+    """Try to parse and validate `text` as `model`. Return None on any failure."""
+    raw = _extract_json(text)
+    if raw is None:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    try:
+        return model.model_validate(data)
+    except ValidationError:
+        return None
+
+
+# ── ADK agent streaming ─────────────────────────────────────────────────────
 
 
 async def _run_agent_streaming(
     agent_name: str,
-    agent,
+    agent: Any,
     input_text: str,
-    queue: asyncio.Queue,
-):
-    """Run a Google ADK agent, pushing events to queue in real-time."""
-    await queue.put({"type": "iteration", "message": f"[{agent_name}] Starting agent run..."})
+    out_queue: asyncio.Queue,
+) -> str:
+    """Run a single ADK agent end-to-end, pushing live events into `out_queue`.
 
+    Returns the agent's final response text (whatever it produced before
+    the run ended).
+    """
+    from google.adk.runners import Runner as ADKRunner
+    from google.adk.sessions import InMemorySessionService
+    from google.genai import types
+
+    session_service = InMemorySessionService()
+    runner = ADKRunner(
+        agent=agent,
+        app_name="vibeinvest_boardroom",
+        session_service=session_service,
+    )
+    session = await session_service.create_session(
+        app_name="vibeinvest_boardroom", user_id="boardroom_user"
+    )
+
+    content = types.Content(role="user", parts=[types.Part(text=input_text)])
+
+    final_text = ""
     try:
-        # Use the ADK runner with session management
-        from google.adk.runners import Runner as ADKRunner
-        from google.adk.sessions import InMemorySessionService
-        from google.genai import types
-
-        session_service = InMemorySessionService()
-        runner = ADKRunner(
-            agent=agent,
-            app_name="investment_pipeline",
-            session_service=session_service,
-        )
-        session = await session_service.create_session(
-            app_name="investment_pipeline", user_id="pipeline_user"
-        )
-
-        content = types.Content(
-            role="user",
-            parts=[types.Part(text=input_text)],
-        )
-
-        final_text = ""
         async for event in runner.run_async(
-            user_id="pipeline_user",
+            user_id="boardroom_user",
             session_id=session.id,
             new_message=content,
         ):
-            # Emit streaming events based on ADK event structure
-            event_actions = getattr(event, 'actions', None)
-            if event_actions:
-                tool_calls = getattr(event_actions, 'tool_calls', None) or []
+            # Tool calls
+            actions = getattr(event, "actions", None)
+            if actions:
+                tool_calls = getattr(actions, "tool_calls", None) or []
                 for tc in tool_calls:
-                    fn_name = getattr(tc, 'name', None) or getattr(tc, 'function_name', 'unknown')
-                    fn_args = getattr(tc, 'args', None) or getattr(tc, 'arguments', {})
-                    await queue.put({
-                        "type": "tool_call",
-                        "message": f"[{agent_name}] Calling tool: {fn_name}({json.dumps(fn_args) if isinstance(fn_args, dict) else str(fn_args)[:150]})",
-                    })
-
-            # Check for tool results in content parts
-            if event.content and event.content.parts:
-                for part in event.content.parts:
-                    if hasattr(part, 'function_response') and part.function_response:
-                        await queue.put({
-                            "type": "tool_result",
-                            "message": f"[{agent_name}] Tool result received",
-                        })
-                    elif part.text and not event.is_final_response():
-                        await queue.put({
-                            "type": "agent_text",
-                            "message": f"[{agent_name}] {part.text[:300]}",
-                        })
-
-            if event.is_final_response():
-                if event.content and event.content.parts:
-                    final_text = "".join(
-                        part.text for part in event.content.parts if part.text
+                    fn_name = (
+                        getattr(tc, "name", None)
+                        or getattr(tc, "function_name", "unknown")
+                    )
+                    fn_args = getattr(tc, "args", None) or getattr(tc, "arguments", {})
+                    await out_queue.put(
+                        {
+                            "type": "tool_call",
+                            "agent": agent_name,
+                            "tool": fn_name,
+                            "args": fn_args if isinstance(fn_args, dict) else {"raw": str(fn_args)[:300]},
+                        }
                     )
 
-        await queue.put({"type": "agent_complete", "message": f"[{agent_name}] Completed"})
+            # Tool results + streaming text parts
+            if event.content and event.content.parts:
+                for part in event.content.parts:
+                    if getattr(part, "function_response", None):
+                        fr = part.function_response
+                        result = getattr(fr, "response", None)
+                        await out_queue.put(
+                            {
+                                "type": "tool_result",
+                                "agent": agent_name,
+                                "tool": getattr(fr, "name", "unknown"),
+                                "result": result if isinstance(result, (dict, list, str, int, float, bool)) else str(result)[:500],
+                            }
+                        )
+                    elif getattr(part, "text", None) and not event.is_final_response():
+                        await out_queue.put(
+                            {
+                                "type": "agent_text",
+                                "agent": agent_name,
+                                "delta": part.text,
+                            }
+                        )
+
+            if event.is_final_response() and event.content and event.content.parts:
+                final_text = "".join(
+                    p.text for p in event.content.parts if getattr(p, "text", None)
+                )
+    except Exception as exc:
+        await out_queue.put(
+            {"type": "pipeline_error", "agent": agent_name, "error": f"Agent run failed: {exc}"}
+        )
         return final_text
 
-    except Exception as e:
-        await queue.put({"type": "error", "message": f"[{agent_name}] Error: {str(e)}"})
-        return None
+    return final_text
 
 
-async def _drain_queue(queue: asyncio.Queue, task: asyncio.Task):
-    """Drain events from queue while task is running, yielding each one."""
+async def _drain_until_done(queue: asyncio.Queue, task: asyncio.Task) -> AsyncGenerator[dict, None]:
+    """Yield queued events until the agent task finishes, then drain remainder."""
     while not task.done():
         try:
-            event = await asyncio.wait_for(queue.get(), timeout=0.5)
+            event = await asyncio.wait_for(queue.get(), timeout=0.3)
             yield event
         except asyncio.TimeoutError:
             continue
-    # Drain remaining
     while not queue.empty():
-        yield await queue.get()
+        yield queue.get_nowait()
 
 
-async def run_pipeline(company_name: str):
-    """Async generator yielding SSE events for the full 4-agent pipeline."""
+# ── Per-agent runners with JSON validation + one-shot retry ─────────────────
+
+
+_RETRY_PREAMBLE = (
+    "Your previous response was not valid JSON matching the required schema. "
+    "Below is what you returned. Re-emit ONLY the valid JSON object, no fences, "
+    "no preamble, no commentary. Here is your previous output:\n\n"
+)
+
+
+async def _run_and_parse(
+    agent_name: str,
+    agent: Any,
+    user_msg: str,
+    model: Type[BaseModel],
+    queue: asyncio.Queue,
+) -> AsyncGenerator[Any, None]:
+    """Run an agent once, retry once on parse failure. Yields SSE events + the
+    parsed report (or `None` on terminal failure) as the LAST item.
+
+    The trailing yield is a sentinel dict: `{"_done": True, "report": <model|None>}`.
+    The orchestrator consumes events, picks up the sentinel, and uses the parsed
+    report (or emits pipeline_error if None).
+    """
+    # First attempt
+    task = asyncio.create_task(_run_agent_streaming(agent_name, agent, user_msg, queue))
+    async for event in _drain_until_done(queue, task):
+        yield event
+    final_text = await task
+
+    parsed = _parse(final_text, model)
+    if parsed is not None:
+        yield {"_done": True, "report": parsed}
+        return
+
+    # Retry once with a fix-it instruction
+    retry_msg = _RETRY_PREAMBLE + final_text
+    task = asyncio.create_task(_run_agent_streaming(agent_name, agent, retry_msg, queue))
+    async for event in _drain_until_done(queue, task):
+        yield event
+    final_text = await task
+
+    parsed = _parse(final_text, model)
+    yield {"_done": True, "report": parsed}
+
+
+# ── Orchestrator ────────────────────────────────────────────────────────────
+
+
+def _skeptic_user_message(idea_text: str, output_language: str) -> str:
+    return (
+        f"Analyze this Pakistani startup idea:\n\n{idea_text}\n\n"
+        f"Output language for free-text fields: {output_language}. "
+        "Return strictly valid JSON per your output contract."
+    )
+
+
+def _munshi_user_message(idea_text: str, skeptic_report: BaseModel, output_language: str) -> str:
+    return (
+        f"Analyze the financial reality of this Pakistani startup idea:\n\n{idea_text}\n\n"
+        f"The Skeptic has just reported:\n{skeptic_report.model_dump_json(indent=2)}\n\n"
+        f"Output language: {output_language}. "
+        "Return strictly valid JSON per your output contract."
+    )
+
+
+def _hype_user_message(
+    idea_text: str, skeptic_report: BaseModel, munshi_report: BaseModel, output_language: str
+) -> str:
+    return (
+        f"Re-pitch and brand this Pakistani startup idea:\n\n{idea_text}\n\n"
+        f"Skeptic's report:\n{skeptic_report.model_dump_json(indent=2)}\n\n"
+        f"Munshi's report:\n{munshi_report.model_dump_json(indent=2)}\n\n"
+        f"Output language: {output_language}. "
+        "Return strictly valid JSON per your output contract."
+    )
+
+
+def _cvo_user_message(
+    idea_text: str,
+    skeptic_report: BaseModel,
+    munshi_report: BaseModel,
+    hype_report: BaseModel,
+    output_language: str,
+) -> str:
+    return (
+        f"Synthesize the boardroom's verdict on this Pakistani startup idea:\n\n{idea_text}\n\n"
+        f"Skeptic's report:\n{skeptic_report.model_dump_json(indent=2)}\n\n"
+        f"Munshi's report:\n{munshi_report.model_dump_json(indent=2)}\n\n"
+        f"Hype's report:\n{hype_report.model_dump_json(indent=2)}\n\n"
+        f"Output language: {output_language}. "
+        "Return strictly valid JSON per your output contract."
+    )
+
+
+async def run_pipeline(idea_text: str, output_language: str = "en") -> AsyncGenerator[dict, None]:
+    """Run the 4-agent VibeInvest boardroom and yield SSE events.
+
+    Each agent: stream live events → parse final response → one-shot retry on
+    parse failure → emit `agent_complete` with the structured report. After
+    all four succeed, emit `pipeline_complete` with the CVO's final report.
+    """
+    run_id = uuid.uuid4().hex[:8]
+    yield {"type": "pipeline_start", "run_id": run_id, "idea_text": idea_text}
+
     queue: asyncio.Queue = asyncio.Queue()
 
-    yield {"type": "pipeline_start", "message": f"Starting Google ADK pipeline for: {company_name}"}
+    # ── Skeptic ──
+    yield {"type": "agent_start", "agent": "skeptic"}
+    skeptic_report: BaseModel | None = None
+    async for item in _run_and_parse(
+        "skeptic", skeptic_agent,
+        _skeptic_user_message(idea_text, output_language),
+        SkepticReport, queue,
+    ):
+        if isinstance(item, dict) and item.get("_done"):
+            skeptic_report = item["report"]
+        else:
+            yield item
 
-    # ── Agent 1: Researcher ──
-    yield {"type": "agent_start", "message": "========== Agent 1: RESEARCHER =========="}
-
-    researcher_input = f"Search for information about {company_name} including their founding year, revenue, number of employees, and sector. Provide a brief research summary."
-
-    task = asyncio.create_task(
-        _run_agent_streaming("Researcher", researcher_agent, researcher_input, queue)
-    )
-    async for event in _drain_queue(queue, task):
-        yield event
-    research_output = await task
-
-    if not research_output:
-        yield {"type": "error", "message": "Researcher agent produced no output"}
+    if skeptic_report is None:
+        yield {"type": "pipeline_error", "agent": "skeptic", "error": "Skeptic produced malformed JSON twice"}
         return
-    yield {"type": "agent_output", "message": f"[Researcher Output]\n{research_output}"}
 
-    # ── Agent 2: Analyzer ──
-    yield {"type": "agent_start", "message": "========== Agent 2: ANALYZER =========="}
+    yield {"type": "agent_complete", "agent": "skeptic", "report": skeptic_report.model_dump()}
+    yield {"type": "agent_handoff", "from": "skeptic", "to": "munshi"}
 
-    analyzer_input = f"""You have received the following research brief from the Research Agent:
+    # ── Munshi ──
+    yield {"type": "agent_start", "agent": "munshi"}
+    munshi_report: BaseModel | None = None
+    async for item in _run_and_parse(
+        "munshi", munshi_agent,
+        _munshi_user_message(idea_text, skeptic_report, output_language),
+        MunshiReport, queue,
+    ):
+        if isinstance(item, dict) and item.get("_done"):
+            munshi_report = item["report"]
+        else:
+            yield item
 
-{research_output}
-
-Please analyze this information by:
-1. Calculating the revenue_per_employee metric
-2. Scoring the investment opportunity
-3. Providing your investment recommendation
-
-Use the available tools to complete this analysis."""
-
-    task = asyncio.create_task(
-        _run_agent_streaming("Analyzer", analyzer_agent, analyzer_input, queue)
-    )
-    async for event in _drain_queue(queue, task):
-        yield event
-    analysis_output = await task
-
-    if not analysis_output:
-        yield {"type": "error", "message": "Analyzer agent produced no output"}
+    if munshi_report is None:
+        yield {"type": "pipeline_error", "agent": "munshi", "error": "Munshi produced malformed JSON twice"}
         return
-    yield {"type": "agent_output", "message": f"[Analyzer Output]\n{analysis_output}"}
 
-    # ── Agent 3: Writer ──
-    yield {"type": "agent_start", "message": "========== Agent 3: WRITER =========="}
+    yield {"type": "agent_complete", "agent": "munshi", "report": munshi_report.model_dump()}
+    yield {"type": "agent_handoff", "from": "munshi", "to": "hype"}
 
-    writer_input = f"""You are an investment memo writer. You have received the following inputs:
+    # ── Hype ──
+    yield {"type": "agent_start", "agent": "hype"}
+    hype_report: BaseModel | None = None
+    async for item in _run_and_parse(
+        "hype", hype_agent,
+        _hype_user_message(idea_text, skeptic_report, munshi_report, output_language),
+        HypeReport, queue,
+    ):
+        if isinstance(item, dict) and item.get("_done"):
+            hype_report = item["report"]
+        else:
+            yield item
 
---- RESEARCH BRIEF (from Researcher Agent) ---
-{research_output}
+    if hype_report is None:
+        yield {"type": "pipeline_error", "agent": "hype", "error": "Hype produced malformed JSON twice"}
+        return
 
---- ANALYSIS BRIEF (from Analyzer Agent) ---
-{analysis_output}
+    yield {"type": "agent_complete", "agent": "hype", "report": hype_report.model_dump()}
+    yield {"type": "agent_handoff", "from": "hype", "to": "cvo"}
 
-Draft a professional 2-page investment memo for {company_name}. Use the format_memo tool with these sections:
-1. Executive Summary - 2-3 sentence overview
-2. Company Overview - What the company does, founding, sector
-3. Financial Analysis - Key metrics and growth potential
-4. Investment Thesis - Why this is compelling
-5. Key Risks - 3-4 bullet points
-6. Recommendation - Final investment recommendation
+    # ── CVO ──
+    yield {"type": "agent_start", "agent": "cvo"}
+    final_report: BaseModel | None = None
+    async for item in _run_and_parse(
+        "cvo", cvo_agent,
+        _cvo_user_message(idea_text, skeptic_report, munshi_report, hype_report, output_language),
+        FinalReport, queue,
+    ):
+        if isinstance(item, dict) and item.get("_done"):
+            final_report = item["report"]
+        else:
+            yield item
 
-Keep it professional and concise."""
+    if final_report is None:
+        yield {"type": "pipeline_error", "agent": "cvo", "error": "CVO produced malformed JSON twice"}
+        return
 
-    task = asyncio.create_task(
-        _run_agent_streaming("Writer", writer_agent, writer_input, queue)
-    )
-    async for event in _drain_queue(queue, task):
-        yield event
-    writer_output = await task
-
-    if writer_output:
-        yield {"type": "agent_output", "message": f"[Writer Output]\n{writer_output}"}
-
-    # ── Agent 4: QA/Review ──
-    yield {"type": "agent_start", "message": "========== Agent 4: QA / REVIEW =========="}
-
-    qa_input = f"""You are a senior QA reviewer for investment memos. Your job is to ensure factual accuracy and flag any problems.
-
-You have 3 documents to cross-reference:
-
---- ORIGINAL RESEARCH (Source of Truth) ---
-{research_output}
-
---- ANALYSIS ---
-{analysis_output}
-
---- INVESTMENT MEMO (To Review) ---
-{writer_output}
-
-Your task:
-1. Fact-check at least 3-5 key claims in the memo against the original research data using the fact_check tool.
-2. Flag issues using the flag_issue tool for any hallucinations, inconsistencies, unsupported claims, or missing information.
-3. Provide a final QA summary with:
-   - Overall quality score (1-10)
-   - Number of issues found by severity
-   - Whether the memo is APPROVED, NEEDS REVISION, or REJECTED
-   - Specific revision requests if needed"""
-
-    task = asyncio.create_task(
-        _run_agent_streaming("QA", qa_agent, qa_input, queue)
-    )
-    async for event in _drain_queue(queue, task):
-        yield event
-    qa_output = await task
-
-    if qa_output:
-        yield {"type": "agent_output", "message": f"[QA Output]\n{qa_output}"}
-
-    # ── Final summary ──
-    yield {
-        "type": "pipeline_complete",
-        "message": "Pipeline complete! All 4 agents finished successfully.",
-        "research": research_output or "",
-        "analysis": analysis_output or "",
-        "memo": writer_output or "",
-        "qa_review": qa_output or "",
-    }
+    yield {"type": "agent_complete", "agent": "cvo", "report": final_report.model_dump()}
+    yield {"type": "pipeline_complete", "final_report": final_report.model_dump()}

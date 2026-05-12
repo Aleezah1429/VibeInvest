@@ -1,8 +1,9 @@
 import json
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 log = logging.getLogger(__name__)
@@ -27,47 +28,48 @@ from api.services.google_adk_runner import run_pipeline as run_google_adk_pipeli
 router = APIRouter(prefix="/api/run")
 
 
-class RunRequest(BaseModel):
+class BoardroomRequest(BaseModel):
+    """VibeInvest pipeline input — what the founder submitted."""
+    idea_text: str = Field(min_length=20, max_length=2000)
+    output_language: Literal["en", "ur", "roman-ur"] = "en"
+
+
+class LegacyRunRequest(BaseModel):
+    """Backwards-compat shape used by the Claude / OpenAI comparison runners."""
     company_name: str
 
 
 @router.post("/claude")
-async def run_claude(request: RunRequest):
+async def run_claude(request: LegacyRunRequest):
     if run_claude_pipeline is None:
         raise HTTPException(status_code=503, detail="Claude runner not available")
 
     async def event_generator():
         async for event in run_claude_pipeline(request.company_name):
-            yield {
-                "event": event["type"],
-                "data": json.dumps(event),
-            }
+            yield {"event": event["type"], "data": json.dumps(event)}
 
     return EventSourceResponse(event_generator())
 
 
 @router.post("/openai")
-async def run_openai(request: RunRequest):
+async def run_openai(request: LegacyRunRequest):
     if run_openai_pipeline is None:
         raise HTTPException(status_code=503, detail="OpenAI runner not available")
 
     async def event_generator():
         async for event in run_openai_pipeline(request.company_name):
-            yield {
-                "event": event["type"],
-                "data": json.dumps(event),
-            }
+            yield {"event": event["type"], "data": json.dumps(event)}
 
     return EventSourceResponse(event_generator())
 
 
 @router.post("/google-adk")
-async def run_google_adk(request: RunRequest):
+async def run_google_adk(request: BoardroomRequest):
     async def event_generator():
-        async for event in run_google_adk_pipeline(request.company_name):
-            yield {
-                "event": event["type"],
-                "data": json.dumps(event),
-            }
+        async for event in run_google_adk_pipeline(
+            idea_text=request.idea_text,
+            output_language=request.output_language,
+        ):
+            yield {"event": event["type"], "data": json.dumps(event)}
 
     return EventSourceResponse(event_generator())

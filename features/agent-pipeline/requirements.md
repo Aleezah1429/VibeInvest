@@ -38,20 +38,20 @@
 - [x] R24: Verdict-to-score mapping enforced: `pass` < 400, `pivot` 400–599, `iterate` 600–799, `invest` ≥ 800
 
 ## SSE contract
-- [ ] R25: Emits `pipeline_start` first, with `run_id` and `idea_text`
-- [ ] R26: Emits `agent_start` before each agent, `agent_complete` after, with the agent's structured report
-- [ ] R27: Emits `agent_handoff` between agents
-- [ ] R28: Emits `pipeline_complete` last, with the full `final_report`
-- [ ] R29: On any unrecoverable failure, emits `pipeline_error` and closes the stream cleanly
+- [x] R25: Emits `pipeline_start` first, with `run_id` and `idea_text`
+- [x] R26: Emits `agent_start` before each agent, `agent_complete` after, with the agent's structured report (parsed Pydantic model dumped to dict)
+- [x] R27: Emits `agent_handoff` between agents (3 handoffs total: skeptic→munshi, munshi→hype, hype→cvo)
+- [x] R28: Emits `pipeline_complete` last, with the full `final_report`
+- [x] R29: On any unrecoverable failure, emits `pipeline_error` and closes the stream cleanly
 
 ## Robustness
-- [ ] R30: On JSON parse failure from any agent, the orchestrator retries that agent once with the malformed output and a fix-it instruction
-- [ ] R31: After one retry, gives up and emits `pipeline_error` with `agent` set
-- [ ] R32: Total pipeline latency < 45 seconds for the three curated demo ideas (Phase 0 target)
+- [x] R30: On JSON parse failure from any agent, the orchestrator retries that agent once with the malformed output and a fix-it instruction (`_RETRY_PREAMBLE`)
+- [x] R31: After one retry, gives up and emits `pipeline_error` with `agent` set
+- [ ] R32: Total pipeline latency < 45 seconds for the three curated demo ideas *(needs end-to-end run with API key to verify)*
 
 ## Wiring sanity
-- [ ] R33: `api/services/google_adk_runner.py` imports work without modification
-- [ ] R34: `curl -N -X POST http://localhost:8000/api/run/google-adk -d '{"idea_text":"chai delivery LUMS"}'` streams events end-to-end
+- [x] R33: `api/services/google_adk_runner.py` rewired to use new contracts — imports the four agents + Pydantic models via `importlib.util.spec_from_file_location`
+- [ ] R34: `curl -N -X POST http://localhost:8000/api/run/google-adk -d '{"idea_text":"chai delivery LUMS"}'` streams events end-to-end *(needs API key)*
 
 ## Non-functional
 - [x] R35: All agent prompts live in their own `<name>_agent.py` file — no inline prompts in `agent_system.py` or the runner *(flat structure — see specs/tech.md)*

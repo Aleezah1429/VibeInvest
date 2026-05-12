@@ -12,12 +12,12 @@ Phase-by-phase progress checklist. Tick `[x]` only when the feature is shipped, 
 
 | Feature | Spec | Owner | Status |
 | --- | --- | --- | --- |
-| Agent pipeline (Skeptic → Munshi → Hype → CVO via google-adk) | [features/agent-pipeline/](../features/agent-pipeline/) | Lane A | [ ] |
-| Launchpad (welcome + CTA) | [features/launchpad/](../features/launchpad/) | Lane B / C | [ ] |
-| Upload Hub (text input, multimodal UI stubbed) | [features/upload-hub/](../features/upload-hub/) | Lane B | [ ] |
-| Squad Report (live boardroom: 4 agents streaming) | [features/squad-report/](../features/squad-report/) | Lane B | [ ] |
-| Aura Audit (score gauge + green/red flags) | [features/aura-audit/](../features/aura-audit/) | Lane B / C | [ ] |
-| Final Verdict & Share (verdict + Aura Card PNG) | [features/final-verdict/](../features/final-verdict/) | Lane B / C | [ ] |
+| Agent pipeline (Skeptic → Munshi → Hype → CVO via google-adk) | [features/agent-pipeline/](../features/agent-pipeline/) | Lane A | [x] *(code shipped; end-to-end run needs `.env` GOOGLE_API_KEY)* |
+| Launchpad (welcome + CTA) | [features/launchpad/](../features/launchpad/) | Lane B / C | [x] |
+| Upload Hub (text input, multimodal UI stubbed) | [features/upload-hub/](../features/upload-hub/) | Lane B | [x] |
+| Squad Report (live boardroom: 4 agents streaming) | [features/squad-report/](../features/squad-report/) | Lane B | [x] |
+| Aura Audit (score gauge + green/red flags) | [features/aura-audit/](../features/aura-audit/) | Lane B / C | [x] |
+| Final Verdict & Share (verdict + PDF export + LinkedIn/WhatsApp) | [features/final-verdict/](../features/final-verdict/) | Lane B / C | [x] |
 
 **Definition of done:**
 - [ ] Live public URL works from a phone hotspot
