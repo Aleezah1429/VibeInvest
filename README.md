@@ -29,6 +29,14 @@ See [AGENTS.md](AGENTS.md) for system prompts, tools, and I/O contracts.
 
 ```
 VibeInvest/
+├── specs/                 Project-level spec system (mission, tech, roadmap)
+├── features/              Per-feature folders (plan + requirements + validations)
+│   ├── launchpad/
+│   ├── upload-hub/
+│   ├── agent-pipeline/
+│   ├── squad-report/
+│   ├── aura-audit/
+│   └── final-verdict/
 ├── api/                   FastAPI backend + agent runners (Python)
 │   ├── main.py            App entry, CORS, /api/health
 │   ├── routers/run.py     SSE endpoints: /api/run/{claude,openai,google-adk}
@@ -39,11 +47,15 @@ VibeInvest/
 │   └── lib/sdk-data.ts    SDK metadata (to be replaced with agent metadata)
 ├── VibeInvest/            Inner git repo — submission artifact
 ├── README.md              ← you are here
-├── ROADMAP.md             10-day hackathon plan
+├── WORKFLOW.md            How we build (spec-driven, hackathon edition)
+├── ROADMAP.md             2-day hour-by-hour sprint plan
 ├── FEATURES.md            MVP / v1.5 / future feature tiers
 ├── PHASES.md              Hackathon → 12-month vision
-└── AGENTS.md              Per-agent specs, prompts, tools
+├── AGENTS.md              Per-agent specs, prompts, tools
+└── todo.md                Live sprint capture (informal)
 ```
+
+**Spec-driven structure.** Every feature lives in `features/<name>/` with three files: `plan.md` (the design), `requirements.md` (R1, R2, … developer checklist), and `validations.md` (V1, V2, … user-visible acceptance tests). Read [WORKFLOW.md](WORKFLOW.md) before starting work on any feature.
 
 **Note:** the `google-adk-agent/` directory referenced by `api/services/google_adk_runner.py` does not exist yet. Creating it (with `agent_system.py` defining the four agents and their tools) is task #1 — see [ROADMAP.md](ROADMAP.md) Day 1.
 
@@ -139,9 +151,10 @@ Pre-loaded idea: *"Chai delivery startup for university campuses in Lahore."*
 
 ## Where to go next
 
-- New to the project? Read [ROADMAP.md](ROADMAP.md) for the day-by-day plan.
-- Building an agent? Read [AGENTS.md](AGENTS.md).
-- Scoping a feature? Read [FEATURES.md](FEATURES.md).
+- New to the project? Read [specs/mission.md](specs/mission.md), then [WORKFLOW.md](WORKFLOW.md).
+- Picking up a feature? Open its folder in [features/](features/) — start with `plan.md`, then `requirements.md`.
+- Building an agent? Read [AGENTS.md](AGENTS.md) and [features/agent-pipeline/](features/agent-pipeline/).
+- Day-by-day plan? Read [ROADMAP.md](ROADMAP.md) (Phase 0) and [specs/roadmap.md](specs/roadmap.md) (all phases).
 - Pitching the long-term vision? Read [PHASES.md](PHASES.md).
 
 ---
