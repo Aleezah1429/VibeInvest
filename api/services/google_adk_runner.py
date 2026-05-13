@@ -13,7 +13,7 @@ a fix-it instruction, then emit `pipeline_error` and bail.
 - tool_result      { agent, tool, result }
 - agent_complete   { agent, report }       <-- structured (parsed Pydantic model)
 - agent_handoff    { from, to }
-- pipeline_complete { final_report }
+- pipeline_complete { final_report, tokens_in, tokens_out, cost_pkr_estimate }
 - pipeline_error   { agent?, error }
 """
 from __future__ import annotations
@@ -21,12 +21,16 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+import logging
 import re
 import uuid
 from pathlib import Path
 from typing import Any, AsyncGenerator, Type
 
 from pydantic import BaseModel, ValidationError
+
+
+log = logging.getLogger(__name__)
 
 
 # ── Load the agent system (hyphenated dir, so use spec_from_file_location) ──
@@ -63,6 +67,25 @@ SkepticReport = _contracts_mod.SkepticReport
 MunshiReport = _contracts_mod.MunshiReport
 HypeReport = _contracts_mod.HypeReport
 FinalReport = _contracts_mod.FinalReport
+
+# Load shared utilities (retry, cost, token extraction).
+_util_spec = importlib.util.spec_from_file_location(
+    "google_adk_util", str(_AGENT_DIR / "util.py")
+)
+_util_mod = importlib.util.module_from_spec(_util_spec)
+_util_spec.loader.exec_module(_util_mod)
+
+estimate_cost_pkr = _util_mod.estimate_cost_pkr
+extract_token_counts = _util_mod.extract_token_counts
+
+
+# Model attribution for the four agents (used for cost estimation).
+_AGENT_MODELS = {
+    "skeptic": "gemini-2.5-flash",
+    "munshi":  "gemini-2.5-flash",
+    "hype":    "gemini-2.5-flash",
+    "cvo":     "gemini-2.5-pro",
+}
 
 
 # ── JSON parsing helpers ────────────────────────────────────────────────────
@@ -107,16 +130,16 @@ def _parse(text: str, model: Type[BaseModel]) -> BaseModel | None:
 # ── ADK agent streaming ─────────────────────────────────────────────────────
 
 
-async def _run_agent_streaming(
+async def _stream_agent_once(
     agent_name: str,
     agent: Any,
     input_text: str,
     out_queue: asyncio.Queue,
-) -> str:
-    """Run a single ADK agent end-to-end, pushing live events into `out_queue`.
+) -> tuple[str, int, int]:
+    """Single ADK streaming pass.
 
-    Returns the agent's final response text (whatever it produced before
-    the run ended).
+    Returns (final_text, tokens_in, tokens_out). Raises on any failure — the
+    caller's retry wrapper decides whether to try again.
     """
     from google.adk.runners import Runner as ADKRunner
     from google.adk.sessions import InMemorySessionService
@@ -135,65 +158,106 @@ async def _run_agent_streaming(
     content = types.Content(role="user", parts=[types.Part(text=input_text)])
 
     final_text = ""
-    try:
-        async for event in runner.run_async(
-            user_id="boardroom_user",
-            session_id=session.id,
-            new_message=content,
-        ):
-            # Tool calls
-            actions = getattr(event, "actions", None)
-            if actions:
-                tool_calls = getattr(actions, "tool_calls", None) or []
-                for tc in tool_calls:
-                    fn_name = (
-                        getattr(tc, "name", None)
-                        or getattr(tc, "function_name", "unknown")
-                    )
-                    fn_args = getattr(tc, "args", None) or getattr(tc, "arguments", {})
+    tokens_in = 0
+    tokens_out = 0
+
+    async for event in runner.run_async(
+        user_id="boardroom_user",
+        session_id=session.id,
+        new_message=content,
+    ):
+        # Track cumulative token usage — ADK usually puts the running total on
+        # each event's usage_metadata, so we take the max across the stream.
+        ti, to = extract_token_counts(event)
+        tokens_in = max(tokens_in, ti)
+        tokens_out = max(tokens_out, to)
+
+        # Tool calls
+        actions = getattr(event, "actions", None)
+        if actions:
+            tool_calls = getattr(actions, "tool_calls", None) or []
+            for tc in tool_calls:
+                fn_name = (
+                    getattr(tc, "name", None)
+                    or getattr(tc, "function_name", "unknown")
+                )
+                fn_args = getattr(tc, "args", None) or getattr(tc, "arguments", {})
+                await out_queue.put(
+                    {
+                        "type": "tool_call",
+                        "agent": agent_name,
+                        "tool": fn_name,
+                        "args": fn_args if isinstance(fn_args, dict) else {"raw": str(fn_args)[:300]},
+                    }
+                )
+
+        # Tool results + streaming text parts
+        if event.content and event.content.parts:
+            for part in event.content.parts:
+                if getattr(part, "function_response", None):
+                    fr = part.function_response
+                    result = getattr(fr, "response", None)
                     await out_queue.put(
                         {
-                            "type": "tool_call",
+                            "type": "tool_result",
                             "agent": agent_name,
-                            "tool": fn_name,
-                            "args": fn_args if isinstance(fn_args, dict) else {"raw": str(fn_args)[:300]},
+                            "tool": getattr(fr, "name", "unknown"),
+                            "result": result if isinstance(result, (dict, list, str, int, float, bool)) else str(result)[:500],
+                        }
+                    )
+                elif getattr(part, "text", None) and not event.is_final_response():
+                    await out_queue.put(
+                        {
+                            "type": "agent_text",
+                            "agent": agent_name,
+                            "delta": part.text,
                         }
                     )
 
-            # Tool results + streaming text parts
-            if event.content and event.content.parts:
-                for part in event.content.parts:
-                    if getattr(part, "function_response", None):
-                        fr = part.function_response
-                        result = getattr(fr, "response", None)
-                        await out_queue.put(
-                            {
-                                "type": "tool_result",
-                                "agent": agent_name,
-                                "tool": getattr(fr, "name", "unknown"),
-                                "result": result if isinstance(result, (dict, list, str, int, float, bool)) else str(result)[:500],
-                            }
-                        )
-                    elif getattr(part, "text", None) and not event.is_final_response():
-                        await out_queue.put(
-                            {
-                                "type": "agent_text",
-                                "agent": agent_name,
-                                "delta": part.text,
-                            }
-                        )
+        if event.is_final_response() and event.content and event.content.parts:
+            final_text = "".join(
+                p.text for p in event.content.parts if getattr(p, "text", None)
+            )
 
-            if event.is_final_response() and event.content and event.content.parts:
-                final_text = "".join(
-                    p.text for p in event.content.parts if getattr(p, "text", None)
-                )
-    except Exception as exc:
-        await out_queue.put(
-            {"type": "pipeline_error", "agent": agent_name, "error": f"Agent run failed: {exc}"}
-        )
-        return final_text
+    return final_text, tokens_in, tokens_out
 
-    return final_text
+
+async def _stream_agent_with_retry(
+    agent_name: str,
+    agent: Any,
+    input_text: str,
+    out_queue: asyncio.Queue,
+    attempts: int = 3,
+    base_delay: float = 1.0,
+) -> tuple[str, int, int]:
+    """Run `_stream_agent_once` with exponential-backoff retry on Exception.
+
+    Happy-path (attempt 1 succeeds) streams events live to `out_queue`. If
+    attempt 1 fails, attempts 2..N stream into a discard queue so the
+    frontend doesn't see duplicate agent_text deltas — it just sees a brief
+    pause before the eventual agent_complete.
+
+    The final exception propagates if all attempts exhaust, so the
+    orchestrator can emit `pipeline_error`.
+    """
+    last_exc: Exception | None = None
+    delay = base_delay
+    for attempt in range(1, attempts + 1):
+        target = out_queue if attempt == 1 else asyncio.Queue()
+        try:
+            return await _stream_agent_once(agent_name, agent, input_text, target)
+        except Exception as exc:
+            last_exc = exc
+            log.warning(
+                "agent %s stream attempt %d/%d failed: %s",
+                agent_name, attempt, attempts, exc,
+            )
+            if attempt == attempts:
+                break
+            await asyncio.sleep(delay)
+            delay *= 2
+    assert last_exc is not None  # exhausted loop entered the except branch
+    raise last_exc
 
 
 async def _drain_until_done(queue: asyncio.Queue, task: asyncio.Task) -> AsyncGenerator[dict, None]:
@@ -225,33 +289,53 @@ async def _run_and_parse(
     model: Type[BaseModel],
     queue: asyncio.Queue,
 ) -> AsyncGenerator[Any, None]:
-    """Run an agent once, retry once on parse failure. Yields SSE events + the
-    parsed report (or `None` on terminal failure) as the LAST item.
+    """Run an agent (with network retry), parse JSON, retry once on parse fail.
 
-    The trailing yield is a sentinel dict: `{"_done": True, "report": <model|None>}`.
-    The orchestrator consumes events, picks up the sentinel, and uses the parsed
-    report (or emits pipeline_error if None).
+    Yields SSE events as they stream, then a sentinel dict as the LAST item:
+    `{"_done": True, "report": <model|None>, "tokens_in": int, "tokens_out": int}`.
+
+    On unrecoverable network failure (after retries), the sentinel carries
+    `_error: <str>` instead, and the orchestrator emits pipeline_error.
     """
-    # First attempt
-    task = asyncio.create_task(_run_agent_streaming(agent_name, agent, user_msg, queue))
+    # First attempt — includes network retry.
+    task = asyncio.create_task(
+        _stream_agent_with_retry(agent_name, agent, user_msg, queue)
+    )
     async for event in _drain_until_done(queue, task):
         yield event
-    final_text = await task
+
+    try:
+        final_text, tokens_in, tokens_out = await task
+    except Exception as exc:
+        yield {"_done": True, "report": None, "tokens_in": 0, "tokens_out": 0, "_error": str(exc)}
+        return
 
     parsed = _parse(final_text, model)
     if parsed is not None:
-        yield {"_done": True, "report": parsed}
+        yield {"_done": True, "report": parsed, "tokens_in": tokens_in, "tokens_out": tokens_out}
         return
 
-    # Retry once with a fix-it instruction
+    # JSON-parse retry: re-ask the model to emit valid JSON. Network retry
+    # is applied here too.
     retry_msg = _RETRY_PREAMBLE + final_text
-    task = asyncio.create_task(_run_agent_streaming(agent_name, agent, retry_msg, queue))
+    task = asyncio.create_task(
+        _stream_agent_with_retry(agent_name, agent, retry_msg, queue)
+    )
     async for event in _drain_until_done(queue, task):
         yield event
-    final_text = await task
+    try:
+        final_text, ti2, to2 = await task
+    except Exception as exc:
+        yield {"_done": True, "report": None, "tokens_in": tokens_in, "tokens_out": tokens_out, "_error": str(exc)}
+        return
 
     parsed = _parse(final_text, model)
-    yield {"_done": True, "report": parsed}
+    yield {
+        "_done": True,
+        "report": parsed,
+        "tokens_in": tokens_in + ti2,
+        "tokens_out": tokens_out + to2,
+    }
 
 
 # ── Orchestrator ────────────────────────────────────────────────────────────
@@ -303,33 +387,89 @@ def _cvo_user_message(
     )
 
 
+# Ring buffer cap for the in-memory run-report store. See api/main.py for the
+# OrderedDict it's stored on.
+REPORT_STORE_CAPACITY = 50
+
+
+def _store_final_report(run_id: str, final_report: BaseModel) -> None:
+    """Stash the final report keyed by run_id for the /export route.
+
+    Bound to app.state.reports if FastAPI started us; otherwise no-op so
+    direct module-level test invocations don't crash.
+    """
+    try:
+        from fastapi import FastAPI  # noqa: F401
+        # Late import to avoid circular at module load.
+        import api.main as _main_mod
+    except Exception:
+        return
+    store = getattr(_main_mod.app.state, "reports", None)
+    if store is None:
+        return
+    store[run_id] = final_report
+    # Evict oldest until under cap.
+    while len(store) > REPORT_STORE_CAPACITY:
+        store.popitem(last=False)
+
+
 async def run_pipeline(idea_text: str, output_language: str = "en") -> AsyncGenerator[dict, None]:
     """Run the 4-agent VibeInvest boardroom and yield SSE events.
 
-    Each agent: stream live events → parse final response → one-shot retry on
-    parse failure → emit `agent_complete` with the structured report. After
-    all four succeed, emit `pipeline_complete` with the CVO's final report.
+    Each agent: stream live events → parse final response → one-shot JSON
+    retry on parse failure → up-to-3 network retries on transient errors →
+    emit `agent_complete` with the structured report. After all four
+    succeed, emit `pipeline_complete` with the CVO's final report plus
+    cumulative token counts and an estimated PKR cost.
     """
     run_id = uuid.uuid4().hex[:8]
     yield {"type": "pipeline_start", "run_id": run_id, "idea_text": idea_text}
 
     queue: asyncio.Queue = asyncio.Queue()
 
+    # Cumulative token totals across the four agents.
+    total_in = 0
+    total_out = 0
+    total_cost_pkr = 0.0
+
+    async def _consume(agent_name: str, agent, user_msg: str, model_cls):
+        """Run one stage, yield SSE events from the queue, and return the
+        parsed report (or None on terminal failure)."""
+        nonlocal total_in, total_out, total_cost_pkr
+        parsed: BaseModel | None = None
+        error_msg: str | None = None
+        async for item in _run_and_parse(agent_name, agent, user_msg, model_cls, queue):
+            if isinstance(item, dict) and item.get("_done"):
+                parsed = item["report"]
+                error_msg = item.get("_error")
+                ti = item.get("tokens_in", 0)
+                to = item.get("tokens_out", 0)
+                total_in += ti
+                total_out += to
+                total_cost_pkr += estimate_cost_pkr(
+                    _AGENT_MODELS.get(agent_name, ""), ti, to
+                )
+            else:
+                yield item
+        # Return-via-attribute pattern (async generators can't return values).
+        yield {"_terminal": True, "report": parsed, "error": error_msg}
+
     # ── Skeptic ──
     yield {"type": "agent_start", "agent": "skeptic"}
     skeptic_report: BaseModel | None = None
-    async for item in _run_and_parse(
-        "skeptic", skeptic_agent,
-        _skeptic_user_message(idea_text, output_language),
-        SkepticReport, queue,
-    ):
-        if isinstance(item, dict) and item.get("_done"):
+    skeptic_error: str | None = None
+    async for item in _consume("skeptic", skeptic_agent,
+                               _skeptic_user_message(idea_text, output_language),
+                               SkepticReport):
+        if isinstance(item, dict) and item.get("_terminal"):
             skeptic_report = item["report"]
+            skeptic_error = item["error"]
         else:
             yield item
 
     if skeptic_report is None:
-        yield {"type": "pipeline_error", "agent": "skeptic", "error": "Skeptic produced malformed JSON twice"}
+        yield {"type": "pipeline_error", "agent": "skeptic",
+               "error": skeptic_error or "Skeptic produced malformed JSON twice"}
         return
 
     yield {"type": "agent_complete", "agent": "skeptic", "report": skeptic_report.model_dump()}
@@ -338,18 +478,19 @@ async def run_pipeline(idea_text: str, output_language: str = "en") -> AsyncGene
     # ── Munshi ──
     yield {"type": "agent_start", "agent": "munshi"}
     munshi_report: BaseModel | None = None
-    async for item in _run_and_parse(
-        "munshi", munshi_agent,
-        _munshi_user_message(idea_text, skeptic_report, output_language),
-        MunshiReport, queue,
-    ):
-        if isinstance(item, dict) and item.get("_done"):
+    munshi_error: str | None = None
+    async for item in _consume("munshi", munshi_agent,
+                               _munshi_user_message(idea_text, skeptic_report, output_language),
+                               MunshiReport):
+        if isinstance(item, dict) and item.get("_terminal"):
             munshi_report = item["report"]
+            munshi_error = item["error"]
         else:
             yield item
 
     if munshi_report is None:
-        yield {"type": "pipeline_error", "agent": "munshi", "error": "Munshi produced malformed JSON twice"}
+        yield {"type": "pipeline_error", "agent": "munshi",
+               "error": munshi_error or "Munshi produced malformed JSON twice"}
         return
 
     yield {"type": "agent_complete", "agent": "munshi", "report": munshi_report.model_dump()}
@@ -358,18 +499,19 @@ async def run_pipeline(idea_text: str, output_language: str = "en") -> AsyncGene
     # ── Hype ──
     yield {"type": "agent_start", "agent": "hype"}
     hype_report: BaseModel | None = None
-    async for item in _run_and_parse(
-        "hype", hype_agent,
-        _hype_user_message(idea_text, skeptic_report, munshi_report, output_language),
-        HypeReport, queue,
-    ):
-        if isinstance(item, dict) and item.get("_done"):
+    hype_error: str | None = None
+    async for item in _consume("hype", hype_agent,
+                               _hype_user_message(idea_text, skeptic_report, munshi_report, output_language),
+                               HypeReport):
+        if isinstance(item, dict) and item.get("_terminal"):
             hype_report = item["report"]
+            hype_error = item["error"]
         else:
             yield item
 
     if hype_report is None:
-        yield {"type": "pipeline_error", "agent": "hype", "error": "Hype produced malformed JSON twice"}
+        yield {"type": "pipeline_error", "agent": "hype",
+               "error": hype_error or "Hype produced malformed JSON twice"}
         return
 
     yield {"type": "agent_complete", "agent": "hype", "report": hype_report.model_dump()}
@@ -378,19 +520,30 @@ async def run_pipeline(idea_text: str, output_language: str = "en") -> AsyncGene
     # ── CVO ──
     yield {"type": "agent_start", "agent": "cvo"}
     final_report: BaseModel | None = None
-    async for item in _run_and_parse(
-        "cvo", cvo_agent,
-        _cvo_user_message(idea_text, skeptic_report, munshi_report, hype_report, output_language),
-        FinalReport, queue,
-    ):
-        if isinstance(item, dict) and item.get("_done"):
+    cvo_error: str | None = None
+    async for item in _consume("cvo", cvo_agent,
+                               _cvo_user_message(idea_text, skeptic_report, munshi_report, hype_report, output_language),
+                               FinalReport):
+        if isinstance(item, dict) and item.get("_terminal"):
             final_report = item["report"]
+            cvo_error = item["error"]
         else:
             yield item
 
     if final_report is None:
-        yield {"type": "pipeline_error", "agent": "cvo", "error": "CVO produced malformed JSON twice"}
+        yield {"type": "pipeline_error", "agent": "cvo",
+               "error": cvo_error or "CVO produced malformed JSON twice"}
         return
 
     yield {"type": "agent_complete", "agent": "cvo", "report": final_report.model_dump()}
-    yield {"type": "pipeline_complete", "final_report": final_report.model_dump()}
+
+    # Stash the final report so /api/run/{run_id}/export can find it.
+    _store_final_report(run_id, final_report)
+
+    yield {
+        "type": "pipeline_complete",
+        "final_report": final_report.model_dump(),
+        "tokens_in": total_in,
+        "tokens_out": total_out,
+        "cost_pkr_estimate": round(total_cost_pkr, 4),
+    }

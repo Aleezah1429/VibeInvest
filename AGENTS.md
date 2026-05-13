@@ -81,9 +81,13 @@ Model choice: **Gemini 2.5 Flash** for Skeptic / Munshi / Hype, **Gemini 2.5 Pro
   "market_saturation_score": 1,
   "differentiation": "2-3 sentences",
   "red_flags": ["string", "..."],
+  "kill_signal": false,
+  "kill_reason": null,
   "verdict_input": "1 paragraph for the CVO"
 }
 ```
+
+`kill_signal` is `true` only when saturation_score ≥ 9 OR three-plus direct competitors already serve the exact same audience+offering with no plausible wedge. Soft pessimism stays in `red_flags`. See [features/agent-hardening/](features/agent-hardening/) for the verdict-cap rules the CVO applies.
 
 ---
 
@@ -130,9 +134,13 @@ Model choice: **Gemini 2.5 Flash** for Skeptic / Munshi / Hype, **Gemini 2.5 Pro
   "realistic_year_1_revenue_pkr": 0,
   "break_even_months": 0,
   "financial_red_flags": ["string", "..."],
+  "kill_signal": false,
+  "kill_reason": null,
   "verdict_input": "1 paragraph for the CVO"
 }
 ```
+
+`kill_signal` is `true` only when the math literally doesn't work — negative gross margin with no path to positive at scale, break-even > 60 months with no capital story, or the unit economics require breaking Pakistani regulations. Thin-margin / slow-ramp concerns stay in `financial_red_flags`.
 
 ---
 
@@ -171,9 +179,13 @@ Model choice: **Gemini 2.5 Flash** for Skeptic / Munshi / Hype, **Gemini 2.5 Pro
   "brand_vibe": "1-2 sentences",
   "pitch_deck_fixes": ["string", "string", "string"],
   "soft_launch_strategy": "1 paragraph, Pakistan-specific",
+  "kill_signal": false,
+  "kill_reason": null,
   "verdict_input": "1 paragraph for the CVO"
 }
 ```
+
+`kill_signal` is `true` only when the idea is fundamentally unbrandable to Pakistani audiences (cultural/religious/regulatory mismatch) or the category is on a clear terminal downward trend in Pakistan. Vague brand concerns stay in `pitch_deck_fixes`.
 
 ---
 
@@ -196,6 +208,16 @@ Model choice: **Gemini 2.5 Flash** for Skeptic / Munshi / Hype, **Gemini 2.5 Pro
 > Also score each of four dimensions 1–10: Market, Money, Brand, Strategy.
 >
 > Return strictly valid JSON matching the `final_report` schema. The top_fixes list must contain exactly three items, each starting with an action verb.
+
+**Kill-signal verdict caps (deterministic).** Count the number of upstream reports with `kill_signal: true`:
+
+| Signals | Required verdict cap | Required aura_score cap |
+| --- | --- | --- |
+| 0 | none (score normally) | none |
+| 1 | `pivot` or `pass` only | < 600 |
+| ≥ 2 | `pass` only | < 400 |
+
+These caps apply even when other dimensions look strong. Quote the kill_reason(s) verbatim in `next_steps`. The CVO never re-litigates a kill_signal; the upstream agent has already proven the load-bearing failure.
 
 **Tools.** None. The CVO synthesizes; it does not search or calculate.
 

@@ -45,6 +45,9 @@ export default function RunPage() {
           dispatch(event);
         }
       } catch (err) {
+        // Strict Mode dev double-invoke and intentional unmount navigation
+        // both abort the in-flight fetch — that's not a real pipeline error.
+        if (err instanceof DOMException && err.name === "AbortError") return;
         const message = err instanceof Error ? err.message : "Connection lost";
         dispatch({ type: "pipeline_error", error: message });
       }

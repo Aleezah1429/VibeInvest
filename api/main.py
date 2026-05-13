@@ -1,3 +1,4 @@
+import collections
 import os
 
 from fastapi import FastAPI
@@ -5,6 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routers import run
 
 app = FastAPI(title="Multi-Agent SDK Comparison API")
+
+# In-memory store for completed FinalReports, keyed by run_id. The export
+# route at GET /api/run/{run_id}/export reads from here. OrderedDict +
+# popitem(last=False) gives us a simple LRU-style ring buffer; capacity is
+# enforced inside google_adk_runner._store_final_report.
+app.state.reports = collections.OrderedDict()
 
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
 allowed_origins = [o.strip() for o in _raw_origins.split(",")]

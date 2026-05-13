@@ -19,6 +19,8 @@ export interface SkepticReport {
   market_saturation_score: number; // 1–10
   differentiation: string;
   red_flags: string[];
+  kill_signal?: boolean;
+  kill_reason?: string | null;
   verdict_input: string;
 }
 
@@ -34,6 +36,8 @@ export interface MunshiReport {
   realistic_year_1_revenue_pkr: number;
   break_even_months: number;
   financial_red_flags: string[];
+  kill_signal?: boolean;
+  kill_reason?: string | null;
   verdict_input: string;
 }
 
@@ -42,6 +46,8 @@ export interface HypeReport {
   brand_vibe: string;
   pitch_deck_fixes: [string, string, string];
   soft_launch_strategy: string;
+  kill_signal?: boolean;
+  kill_reason?: string | null;
   verdict_input: string;
 }
 
@@ -115,7 +121,13 @@ export type SSEEvent =
   | { type: "tool_result"; agent: AgentName; tool: string; result: unknown }
   | { type: "agent_complete"; agent: AgentName; report: AgentReport }
   | { type: "agent_handoff"; from: AgentName; to: AgentName }
-  | { type: "pipeline_complete"; final_report: FinalReport }
+  | {
+      type: "pipeline_complete";
+      final_report: FinalReport;
+      tokens_in?: number;
+      tokens_out?: number;
+      cost_pkr_estimate?: number;
+    }
   | { type: "pipeline_error"; agent?: AgentName; error: string };
 
 export type AgentReport = SkepticReport | MunshiReport | HypeReport | FinalReport;

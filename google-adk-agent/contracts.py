@@ -23,6 +23,8 @@ class SkepticReport(BaseModel):
     market_saturation_score: int = Field(ge=1, le=10)
     differentiation: str
     red_flags: list[str]
+    kill_signal: bool = False
+    kill_reason: str | None = None
     verdict_input: str
 
 
@@ -41,6 +43,8 @@ class MunshiReport(BaseModel):
     realistic_year_1_revenue_pkr: float
     break_even_months: float
     financial_red_flags: list[str]
+    kill_signal: bool = False
+    kill_reason: str | None = None
     verdict_input: str
 
 
@@ -52,6 +56,8 @@ class HypeReport(BaseModel):
     brand_vibe: str
     pitch_deck_fixes: list[str] = Field(min_length=3, max_length=3)
     soft_launch_strategy: str
+    kill_signal: bool = False
+    kill_reason: str | None = None
     verdict_input: str
 
 
