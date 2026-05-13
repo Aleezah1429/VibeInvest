@@ -160,5 +160,3 @@ Pre-loaded idea: *"Chai delivery startup for university campuses in Lahore."*
 ---
 
 *Built with vibes by Team VibeInvest.*
-
-tetsing
