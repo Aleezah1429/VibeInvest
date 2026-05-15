@@ -1,31 +1,85 @@
 # VibeInvest
 
-**Your AI boardroom for Pakistan's next generation of founders.**
-*Get roasted before you get rejected.*
+**Type any startup name. Get instant investor-grade due diligence.**
+*Powered by 4 AI agents that autonomously research, analyze, and score — so you know if a startup is worth your money before you take a single meeting.*
 
-Submission target: AI Seekho 2026 — Phase 2 Hackathon.
 Built on Google ADK (Antigravity) for agent orchestration and Gemini 2.5 for multimodal reasoning.
 
 ---
 
-## What it does
+## What It Does
 
-A founder drops in a startup idea (typed, voice note in Urdu/English, photo of a handwritten plan, or a pitch deck PDF). Four specialized agents tear into it from different angles, hand notes to each other, and a final agent — the CVO — produces an **Aura Score out of 1000** with a verdict (Invest / Iterate / Pivot / Pass) and a concrete fix list.
+Enter a startup name — like "Airlift", "Bazaar Technologies", or "Retailo" — and four specialized AI agents activate in sequence. They search the web, analyze financials, score the brand, hand findings to each other, and deliver a final **Aura Score out of 1000** with a verdict: **Invest · Watch · Pass · Acquire**.
 
-The four agents:
+No pitch decks to read. No analyst hours burned. Just a name.
 
-| Agent | Role | Maps to existing scaffold |
+---
+
+## 👥 Who Uses This
+
+**Primary users:**
+- **Angel investors** evaluating a deal
+- **Acquirers** researching a target company
+- **VCs** doing quick pre-screening
+
+**Secondary users:**
+- **Founders** researching competitors
+- **Journalists** covering startups
+- **Accelerators** screening applicants
+
+---
+
+## 🤖 The Four Agents
+
+| Agent | Role | What It Does |
 | --- | --- | --- |
-| The Skeptic | Market research, competitors, saturation | `Researcher` |
-| The Munshi | Unit economics, PKR-grounded financials | `Analyzer` |
-| The Hype | Branding, taglines, pitch reframing | `Writer` |
-| The CVO | Synthesis, contradictions, Aura Score | `QA/Review` |
+| 🔍 **The Skeptic** | Market Intelligence | Searches the web for funding history, competitors, market position, news mentions, and red flags |
+| 💰 **The Munshi** | Financial Signals | Estimates revenue model viability, funding rounds, burn rate signals, valuation reasonableness from public data |
+| ✨ **The Hype** | Brand & Perception | Analyzes online presence, social traction, founder credibility, PR sentiment, and product-market fit signals |
+| 👑 **The CVO** | Investment Verdict | Synthesizes all three reports into a final Aura Score with verdict |
 
 See [AGENTS.md](AGENTS.md) for system prompts, tools, and I/O contracts.
 
 ---
 
-## Repo layout
+## 🔄 How It Works
+
+```
+[1] INPUT
+    User types a startup name
+    e.g. "Airlift", "Bazaar Technologies", "Retailo"
+    ↓
+[2] AGENTS ACTIVATE
+    Skeptic → web searches startup, news, funding, competitors
+    Munshi  → analyzes business model, revenue signals, valuation
+    Hype    → scores brand, social presence, founder reputation
+    ↓
+[3] AGENT HANDOFFS (visible in UI)
+    Skeptic findings → feeds into Munshi risk assessment
+    Munshi flags     → Hype checks if brand can recover
+    All three        → CVO for final synthesis
+    ↓
+[4] AURA SCORE REVEAL
+    "Bazaar Technologies scores 810/1000 — INVEST ✅"
+    Breakdown: Market 9/10 · Financials 7/10 · Brand 8/10
+    ↓
+[5] FULL REPORT
+    • Funding history & investors
+    • Competitor landscape
+    • Key risks & red flags
+    • Strengths
+    • Final recommendation
+    ↓
+[6] ACTION SIMULATION
+    CVO auto-generates:
+    → Investor brief PDF
+    → "Questions to ask before investing" list
+    → Deal memo draft
+```
+
+---
+
+## Repo Layout
 
 ```
 VibeInvest/
@@ -43,21 +97,17 @@ VibeInvest/
 │   └── services/          One runner per SDK (claude, openai, google-adk)
 ├── frontend/              Next.js 15 + Tailwind 4 + jsPDF
 │   ├── app/               Routes (home + /sdk/[slug] detail)
-│   ├── components/        SdkCard, TerminalOutput, TestNowForm
-│   └── lib/sdk-data.ts    SDK metadata (to be replaced with agent metadata)
-├── VibeInvest/            Inner git repo — submission artifact
+│   ├── components/        UI components for agent pipeline + reports
+│   └── lib/               SDK metadata and utilities
+├── google-adk-agent/      ADK agent definitions and tools
 ├── README.md              ← you are here
+├── SETUP.md               Full setup guide
 ├── WORKFLOW.md            How we build (spec-driven, hackathon edition)
-├── ROADMAP.md             2-day hour-by-hour sprint plan
+├── ROADMAP.md             Sprint plan
 ├── FEATURES.md            MVP / v1.5 / future feature tiers
 ├── PHASES.md              Hackathon → 12-month vision
-├── AGENTS.md              Per-agent specs, prompts, tools
-└── todo.md                Live sprint capture (informal)
+└── AGENTS.md              Per-agent specs, prompts, tools, contracts
 ```
-
-**Spec-driven structure.** Every feature lives in `features/<name>/` with three files: `plan.md` (the design), `requirements.md` (R1, R2, … developer checklist), and `validations.md` (V1, V2, … user-visible acceptance tests). Read [WORKFLOW.md](WORKFLOW.md) before starting work on any feature.
-
-**Note:** the `google-adk-agent/` directory referenced by `api/services/google_adk_runner.py` does not exist yet. Creating it (with `agent_system.py` defining the four agents and their tools) is task #1 — see [ROADMAP.md](ROADMAP.md) Day 1.
 
 ---
 
@@ -65,15 +115,12 @@ VibeInvest/
 
 | Layer | Choice | Why |
 | --- | --- | --- |
-| Frontend | Next.js 15 (App Router), React 19, Tailwind 4 | Already scaffolded; PWA-friendly for mobile |
-| PDF/share | `jspdf` | Already a dep — used for Aura Card and report export |
-| Backend | FastAPI + `sse-starlette` | Already scaffolded; SSE for live agent streaming |
-| Agents | `google-adk` (primary), Anthropic + OpenAI Agents (comparison) | ADK is what Antigravity uses; multi-SDK shows depth |
+| Frontend | Next.js 15 (App Router), React 19, Tailwind 4 | PWA-friendly, already scaffolded |
+| PDF/Share | `jspdf` | Aura Card and report export |
+| Backend | FastAPI + `sse-starlette` | SSE for live agent streaming |
+| Agents | `google-adk` (primary), Anthropic + OpenAI Agents (comparison) | ADK is the Antigravity stack; multi-SDK shows depth |
 | Model | Gemini 2.5 Flash (agents), Gemini 2.5 Pro (CVO synthesis) | Cost/quality split |
-| Multimodal | Gemini vision + audio (handwritten plan OCR, Urdu voice) | Native, no extra service |
-| Storage | Firestore *(optional, for v1.5)* | Reports, share cards, "re-roast" history |
-
-The planning doc originally proposed Flutter + Firebase. We are keeping the existing Next.js + FastAPI scaffold instead because (a) the agent runners are already wired up, (b) Next.js PWA gives us a mobile-installable experience without rewriting, (c) it saves ~2 days of the 10-day budget.
+| Storage | Firestore *(optional, for v1.5)* | Reports, share cards, history |
 
 ---
 
@@ -107,19 +154,19 @@ npm run dev
 
 Open http://localhost:3000.
 
-### Smoke test the pipeline (after Day 1 work)
+### Smoke Test
 
 ```bash
 curl -N -X POST http://localhost:8000/api/run/google-adk \
   -H "Content-Type: application/json" \
-  -d '{"company_name":"Chai delivery for LUMS campus"}'
+  -d '{"company_name":"Bazaar Technologies"}'
 ```
 
-You should see a stream of SSE events: `pipeline_start` → `agent_start` (×4) → `tool_call` / `agent_text` events → `pipeline_complete`.
+You should see a stream of SSE events: `pipeline_start` → `agent_start` (×4) → `tool_call` / `agent_text` events → `pipeline_complete` with the final Aura Score.
 
 ---
 
-## Environment variables
+## Environment Variables
 
 | Var | Where | Purpose |
 | --- | --- | --- |
@@ -130,32 +177,25 @@ You should see a stream of SSE events: `pipeline_start` → `agent_start` (×4) 
 
 ---
 
-## Timeline
+## Demo Script (3 min)
 
-**2 days, 3 people.** See [ROADMAP.md](ROADMAP.md) for the hour-by-hour plan and the explicit cut list. The full multimodal experience promised in the pitch lands in Phase 0.5 (Week 1 after submission) — see [PHASES.md](PHASES.md).
-
----
-
-## Demo (3 min, hackathon)
-
-Pre-loaded idea: *"Chai delivery startup for university campuses in Lahore."*
-
-1. **0:00–0:20** — Open with the 70% failure stat; pitch the boardroom metaphor.
-2. **0:20–0:35** — Paste the idea into the textarea. (Voice input lands in Phase 0.5 — show the mic icon to signal it's coming.)
-3. **0:35–1:20** — Show the four agents activating; highlight the Skeptic naming three plausible chai competitors and the Munshi running PKR-50/cup unit economics.
-4. **1:20–1:50** — CVO reveal: **640 / 1000 — Iterate.** Top three fixes appear.
-5. **1:50–2:05** — Tap "Share" → Aura Card exports to PNG via `jspdf`.
-6. **2:05–3:00** — Close on MoITT alignment, the Phase 0.5 multimodal roadmap, and the long-term vision in [PHASES.md](PHASES.md).
+1. **0:00–0:20** — Open with the problem: investors waste hours on startups that don't survive. Introduce VibeInvest as instant due diligence.
+2. **0:20–0:35** — Type a startup name into the search bar: *"Bazaar Technologies"*.
+3. **0:35–1:20** — Show the four agents activating in sequence; highlight the Skeptic pulling real funding data, the Munshi flagging financial signals, and the Hype scoring brand presence.
+4. **1:20–1:50** — CVO reveal: **810 / 1000 — INVEST ✅**. Dimension breakdown appears.
+5. **1:50–2:10** — Scroll through the full report: funding history, competitor landscape, risks, strengths.
+6. **2:10–2:30** — Show action outputs: investor brief PDF, questions list, deal memo draft.
+7. **2:30–3:00** — Close on the vision: from hackathon demo to the investor's daily tool.
 
 ---
 
-## Where to go next
+## Where to Go Next
 
-- New to the project? Read [specs/mission.md](specs/mission.md), then [WORKFLOW.md](WORKFLOW.md).
+- New to the project? Read [AGENTS.md](AGENTS.md) for agent specs, then [SETUP.md](SETUP.md) for full setup.
 - Picking up a feature? Open its folder in [features/](features/) — start with `plan.md`, then `requirements.md`.
 - Building an agent? Read [AGENTS.md](AGENTS.md) and [features/agent-pipeline/](features/agent-pipeline/).
-- Day-by-day plan? Read [ROADMAP.md](ROADMAP.md) (Phase 0) and [specs/roadmap.md](specs/roadmap.md) (all phases).
-- Pitching the long-term vision? Read [PHASES.md](PHASES.md).
+- Sprint plan? Read [ROADMAP.md](ROADMAP.md).
+- Long-term vision? Read [PHASES.md](PHASES.md).
 
 ---
 
