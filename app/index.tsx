@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -7,9 +7,11 @@ export default function SplashScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.top}>
-        <View style={styles.mark}>
-          <View style={styles.markInner} />
-        </View>
+        <Image 
+          source={require('../assets/images/VI-logo.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
         <Text style={styles.h}>
           Vibe<Text style={styles.hSpan}>Invest</Text>
         </Text>
@@ -61,23 +63,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 28,
   },
-  mark: {
-    width: 64,
-    height: 64,
-    backgroundColor: '#6366f1',
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logoImage: {
+    width: 80,
+    height: 80,
     marginBottom: 20,
-  },
-  markInner: {
-    width: 32,
-    height: 32,
-    borderWidth: 2.5,
-    borderColor: '#fff',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   h: {
     fontSize: 26,
