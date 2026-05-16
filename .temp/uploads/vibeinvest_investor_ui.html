@@ -1,0 +1,507 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+.phone{max-width:375px;margin:0 auto;background:#09090F;min-height:780px;border-radius:36px;overflow:hidden;border:1.5px solid #1e1e2e;font-family:var(--font-sans);}
+.screen{display:none;animation:fadeIn 0.3s ease;}
+.screen.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes agentSlide{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes ping{0%{transform:scale(1);opacity:1}70%{transform:scale(1.8);opacity:0}100%{transform:scale(1);opacity:0}}
+@keyframes barGrow{from{width:0}to{width:var(--w)}}
+@keyframes countUp{from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}}
+
+/* SPLASH */
+#splash{background:#09090F;min-height:780px;display:flex;flex-direction:column;padding:0;}
+.splash-top{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 28px 24px;position:relative;}
+.grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(99,102,241,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.06) 1px,transparent 1px);background-size:32px 32px;}
+.vi-mark{width:64px;height:64px;background:#6366f1;border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;position:relative;z-index:2;}
+.vi-mark-inner{width:32px;height:32px;border:2.5px solid #fff;border-radius:8px;position:relative;}
+.vi-mark-inner::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;background:#fff;border-radius:3px;}
+.splash-h{font-size:26px;font-weight:700;color:#fff;letter-spacing:-0.5px;position:relative;z-index:2;text-align:center;}
+.splash-h span{color:#818cf8;}
+.splash-p{font-size:13px;color:rgba(255,255,255,0.45);margin-top:8px;text-align:center;line-height:1.5;position:relative;z-index:2;max-width:260px;}
+.splash-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;width:100%;margin-top:32px;position:relative;z-index:2;}
+.stat-box{background:rgba(255,255,255,0.05);border:0.5px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px 8px;text-align:center;}
+.stat-n{font-size:18px;font-weight:700;color:#fff;}
+.stat-l{font-size:10px;color:rgba(255,255,255,0.35);margin-top:2px;}
+.splash-bottom{padding:24px 24px 36px;}
+.btn-primary{width:100%;padding:17px;background:#6366f1;border:none;color:#fff;font-size:15px;font-weight:600;border-radius:50px;cursor:pointer;letter-spacing:0.2px;}
+.btn-ghost{width:100%;padding:14px;background:transparent;border:0.5px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);font-size:13px;border-radius:50px;cursor:pointer;margin-top:10px;}
+.trust-row{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;}
+.trust-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;}
+.trust-txt{font-size:11px;color:rgba(255,255,255,0.3);}
+
+/* SEARCH SCREEN */
+#search-screen{background:#09090F;min-height:780px;}
+.top-bar{padding:20px 20px 0;display:flex;align-items:center;gap:10px;}
+.back-btn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.07);border:0.5px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.7);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.screen-title-sm{font-size:15px;font-weight:600;color:rgba(255,255,255,0.8);}
+.search-hero{padding:24px 20px 8px;}
+.search-hero-h{font-size:22px;font-weight:700;color:#fff;line-height:1.3;}
+.search-hero-h span{color:#818cf8;}
+.search-hero-p{font-size:13px;color:rgba(255,255,255,0.4);margin-top:6px;line-height:1.5;}
+.search-box{margin:20px 20px 0;background:rgba(255,255,255,0.05);border:1px solid rgba(99,102,241,0.4);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:10px;}
+.search-box input{flex:1;background:transparent;border:none;color:#fff;font-size:15px;outline:none;font-family:var(--font-sans);}
+.search-box input::placeholder{color:rgba(255,255,255,0.25);}
+.search-icon{color:rgba(255,255,255,0.3);font-size:18px;}
+.section-lbl{padding:20px 20px 10px;font-size:11px;letter-spacing:1px;color:rgba(255,255,255,0.3);text-transform:uppercase;}
+.detail-fields{padding:0 20px;display:flex;flex-direction:column;gap:10px;}
+.field-row{display:flex;flex-direction:column;gap:6px;}
+.field-label{font-size:12px;color:rgba(255,255,255,0.4);}
+.field-input{background:rgba(255,255,255,0.04);border:0.5px solid rgba(255,255,255,0.1);border-radius:10px;padding:11px 14px;color:#fff;font-size:13px;font-family:var(--font-sans);}
+.field-input::placeholder{color:rgba(255,255,255,0.2);}
+.field-row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.intent-row{display:flex;gap:8px;padding:0 20px;margin-top:4px;}
+.intent-btn{flex:1;padding:10px 6px;border-radius:10px;border:0.5px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.45);font-size:12px;cursor:pointer;text-align:center;transition:all 0.15s;}
+.intent-btn.active{border-color:#6366f1;background:rgba(99,102,241,0.15);color:#818cf8;}
+.recent-list{padding:0 20px;display:flex;flex-direction:column;gap:8px;}
+.recent-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(255,255,255,0.04);border:0.5px solid rgba(255,255,255,0.08);border-radius:12px;cursor:pointer;}
+.recent-logo{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.recent-info{flex:1;}
+.recent-name{font-size:13px;font-weight:600;color:#fff;}
+.recent-meta{font-size:11px;color:rgba(255,255,255,0.35);margin-top:1px;}
+.recent-score{font-size:12px;font-weight:700;color:#818cf8;}
+.analyze-area{padding:20px;}
+.btn-analyze{width:100%;padding:17px;background:#6366f1;border:none;color:#fff;font-size:15px;font-weight:600;border-radius:50px;cursor:pointer;}
+
+/* LOADING */
+#loading-screen{background:#09090F;min-height:780px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;}
+.loading-badge{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:11px;font-weight:600;padding:6px 16px;border-radius:20px;letter-spacing:0.5px;margin-bottom:24px;}
+.loading-h{font-size:20px;font-weight:700;color:#fff;text-align:center;margin-bottom:6px;}
+.loading-startup{font-size:28px;font-weight:800;color:#818cf8;text-align:center;margin-bottom:6px;}
+.loading-sub{font-size:13px;color:rgba(255,255,255,0.35);text-align:center;margin-bottom:36px;}
+.agent-pipeline{width:100%;display:flex;flex-direction:column;gap:10px;}
+.ap-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:14px;border:0.5px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);}
+.ap-row.active{border-color:rgba(99,102,241,0.4);background:rgba(99,102,241,0.07);}
+.ap-row.done{border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.05);}
+.ap-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.ap-info{flex:1;}
+.ap-name{font-size:13px;font-weight:600;color:#fff;}
+.ap-task{font-size:11px;margin-top:1px;}
+.ap-task.idle{color:rgba(255,255,255,0.25);}
+.ap-task.running{color:#818cf8;}
+.ap-task.done{color:#22c55e;}
+.ap-ind{width:8px;height:8px;border-radius:50%;flex-shrink:0;position:relative;}
+.ind-idle{background:rgba(255,255,255,0.15);}
+.ind-running{background:#6366f1;}
+.ind-running::after{content:'';position:absolute;inset:0;border-radius:50%;background:#6366f1;animation:ping 1.2s ease-out infinite;}
+.ind-done{background:#22c55e;}
+.progress-wrap{width:100%;margin-top:28px;}
+.progress-track{width:100%;height:3px;background:rgba(255,255,255,0.08);border-radius:50px;overflow:hidden;}
+.progress-fill{height:100%;background:#6366f1;border-radius:50px;width:0%;transition:width 0.6s ease;}
+.progress-label{display:flex;justify-content:space-between;margin-top:8px;}
+.progress-label span{font-size:11px;color:rgba(255,255,255,0.3);}
+
+/* REPORT */
+#report-screen{background:#09090F;min-height:780px;padding-bottom:40px;}
+.report-header{padding:20px 20px 0;display:flex;justify-content:space-between;align-items:center;}
+.report-back{font-size:13px;color:rgba(255,255,255,0.4);cursor:pointer;display:flex;align-items:center;gap:4px;}
+.report-actions{display:flex;gap:8px;}
+.icon-btn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.07);border:0.5px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,0.6);font-size:16px;}
+.startup-hero{padding:20px 20px 0;display:flex;align-items:center;gap:14px;}
+.startup-logo-lg{width:52px;height:52px;border-radius:14px;background:#1e1b4b;border:0.5px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;font-size:22px;}
+.startup-meta{flex:1;}
+.startup-name-lg{font-size:20px;font-weight:700;color:#fff;}
+.startup-tags{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;}
+.tag{font-size:10px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.45);border:0.5px solid rgba(255,255,255,0.1);}
+.verdict-banner{margin:16px 20px 0;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);border-radius:16px;padding:16px 20px;display:flex;align-items:center;gap:16px;}
+.verdict-score{text-align:center;}
+.vs-num{font-size:32px;font-weight:800;color:#fff;line-height:1;animation:countUp 0.5s ease-out;}
+.vs-label{font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;}
+.verdict-divider{width:1px;height:48px;background:rgba(255,255,255,0.1);}
+.verdict-text{flex:1;}
+.verdict-title{font-size:17px;font-weight:700;color:#818cf8;}
+.verdict-sub{font-size:12px;color:rgba(255,255,255,0.45);margin-top:3px;line-height:1.4;}
+.r-section-lbl{padding:20px 20px 8px;font-size:11px;letter-spacing:1px;color:rgba(255,255,255,0.3);text-transform:uppercase;}
+.dim-grid{padding:0 20px;display:flex;flex-direction:column;gap:8px;}
+.dim-item{display:flex;align-items:center;gap:10px;}
+.dim-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0;color:rgba(255,255,255,0.5);}
+.dim-name{font-size:12px;color:rgba(255,255,255,0.45);width:76px;flex-shrink:0;}
+.dim-track{flex:1;height:5px;background:rgba(255,255,255,0.07);border-radius:50px;overflow:hidden;}
+.dim-fill{height:100%;border-radius:50px;}
+.dim-score{font-size:12px;font-weight:600;color:#fff;width:28px;text-align:right;flex-shrink:0;}
+.agent-reports{padding:0 20px;display:flex;flex-direction:column;gap:10px;}
+.ar-card{background:rgba(255,255,255,0.03);border:0.5px solid rgba(255,255,255,0.08);border-radius:16px;padding:16px;cursor:pointer;}
+.ar-card.expanded{border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.06);}
+.ar-header{display:flex;align-items:center;gap:10px;}
+.ar-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.ar-title{flex:1;}
+.ar-agent-name{font-size:13px;font-weight:600;color:#fff;}
+.ar-agent-role{font-size:11px;color:rgba(255,255,255,0.35);margin-top:1px;}
+.ar-badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;}
+.ar-chevron{font-size:14px;color:rgba(255,255,255,0.3);transition:transform 0.2s;}
+.ar-chevron.open{transform:rotate(180deg);}
+.ar-body{margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(255,255,255,0.07);display:none;}
+.ar-body.show{display:block;}
+.ar-body p{font-size:12px;color:rgba(255,255,255,0.55);line-height:1.7;}
+.ar-findings{margin-top:10px;display:flex;flex-direction:column;gap:6px;}
+.finding{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:rgba(255,255,255,0.5);line-height:1.5;}
+.finding-dot{width:5px;height:5px;border-radius:50%;margin-top:6px;flex-shrink:0;}
+.key-metrics{padding:0 20px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.km-card{background:rgba(255,255,255,0.04);border:0.5px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 14px;}
+.km-label{font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:4px;}
+.km-value{font-size:16px;font-weight:700;color:#fff;}
+.km-change{font-size:11px;margin-top:2px;}
+.cta-strip{padding:20px 20px 0;display:flex;gap:8px;}
+.cta-a{flex:1;padding:16px;border-radius:50px;font-size:14px;font-weight:600;cursor:pointer;border:none;background:#6366f1;color:#fff;text-align:center;}
+.cta-b{flex:1;padding:16px;border-radius:50px;font-size:14px;font-weight:600;cursor:pointer;border:0.5px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.6);text-align:center;}
+</style>
+
+<h2 class="sr-only">VibeInvest investor due diligence app — four interactive screens: home, startup search, agent analysis loading, and deep due diligence report</h2>
+
+<div class="phone">
+
+  <!-- SPLASH -->
+  <div id="splash" class="screen active">
+    <div class="splash-top">
+      <div class="grid-bg"></div>
+      <div class="vi-mark"><div class="vi-mark-inner"></div></div>
+      <div class="splash-h">Vibe<span>Invest</span></div>
+      <p class="splash-p">AI-powered due diligence on any Pakistan startup — before you write the cheque.</p>
+      <div class="splash-stats">
+        <div class="stat-box"><div class="stat-n">4</div><div class="stat-l">AI agents</div></div>
+        <div class="stat-box"><div class="stat-n">5m</div><div class="stat-l">avg report</div></div>
+        <div class="stat-box"><div class="stat-n">PKR</div><div class="stat-l">native data</div></div>
+      </div>
+    </div>
+    <div class="splash-bottom">
+      <button class="btn-primary" onclick="showScreen('search-screen')">Analyze a Startup</button>
+      <button class="btn-ghost" onclick="showScreen('search-screen')">Browse Recent Reports</button>
+      <div class="trust-row"><div class="trust-dot"></div><span class="trust-txt">Trusted by 200+ investors & acquirers in Pakistan</span></div>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div id="search-screen" class="screen">
+    <div class="top-bar">
+      <button class="back-btn" onclick="showScreen('splash')">←</button>
+      <span class="screen-title-sm">New Analysis</span>
+    </div>
+    <div class="search-hero">
+      <div class="search-hero-h">Which startup are you<br><span>researching?</span></div>
+      <p class="search-hero-p">Enter a name and fill in what you know. Our agents will do the rest.</p>
+    </div>
+    <div class="search-box">
+      <i class="ti ti-search search-icon" aria-hidden="true"></i>
+      <input type="text" placeholder="e.g. Airlift, Bykea, Bazaar..." id="startupName" />
+    </div>
+    <div class="section-lbl">Your intent</div>
+    <div class="intent-row">
+      <div class="intent-btn active" onclick="setIntent(this)">Invest</div>
+      <div class="intent-btn" onclick="setIntent(this)">Acquire</div>
+      <div class="intent-btn" onclick="setIntent(this)">Research</div>
+      <div class="intent-btn" onclick="setIntent(this)">Partner</div>
+    </div>
+    <div class="section-lbl">Additional context (optional)</div>
+    <div class="detail-fields">
+      <div class="field-row field-row-2">
+        <div class="field-row">
+          <div class="field-label">Sector</div>
+          <input class="field-input" placeholder="Fintech, Agri..." />
+        </div>
+        <div class="field-row">
+          <div class="field-label">Stage</div>
+          <input class="field-input" placeholder="Seed, Series A..." />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field-label">Known funding (PKR / USD)</div>
+        <input class="field-input" placeholder="e.g. $2M raised, 2023" />
+      </div>
+      <div class="field-row">
+        <div class="field-label">Your concern / focus area</div>
+        <input class="field-input" placeholder="e.g. Worried about burn rate post-layoffs..." />
+      </div>
+    </div>
+    <div class="section-lbl">Recent reports</div>
+    <div class="recent-list">
+      <div class="recent-item" onclick="loadReport('Bykea')">
+        <div class="recent-logo" style="background:#1a1a2e;">🛵</div>
+        <div class="recent-info">
+          <div class="recent-name">Bykea</div>
+          <div class="recent-meta">Mobility · Seed · 3 days ago</div>
+        </div>
+        <div class="recent-score">712</div>
+      </div>
+      <div class="recent-item" onclick="loadReport('Bazaar')">
+        <div class="recent-logo" style="background:#0d1b0d;">🛒</div>
+        <div class="recent-info">
+          <div class="recent-name">Bazaar</div>
+          <div class="recent-meta">B2B Commerce · Series A · 1 week ago</div>
+        </div>
+        <div class="recent-score">841</div>
+      </div>
+    </div>
+    <div class="analyze-area">
+      <button class="btn-analyze" onclick="startAnalysis()">
+        <i class="ti ti-sparkles" aria-hidden="true" style="margin-right:6px;font-size:16px;vertical-align:-2px;"></i>
+        Run Due Diligence
+      </button>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loading-screen" class="screen">
+    <div class="loading-badge">LIVE ANALYSIS</div>
+    <div class="loading-h">Running due diligence on</div>
+    <div class="loading-startup" id="loadingName">Bykea</div>
+    <div class="loading-sub">4 agents are working simultaneously</div>
+    <div class="agent-pipeline" id="agentPipeline">
+      <div class="ap-row active" id="ap1">
+        <div class="ap-avatar" style="background:rgba(239,68,68,0.12);border:0.5px solid rgba(239,68,68,0.25);">🔍</div>
+        <div class="ap-info">
+          <div class="ap-name">The Skeptic</div>
+          <div class="ap-task running" id="t1">Scanning market & competitors...</div>
+        </div>
+        <div class="ap-ind ind-running" id="i1"></div>
+      </div>
+      <div class="ap-row" id="ap2">
+        <div class="ap-avatar" style="background:rgba(34,197,94,0.1);border:0.5px solid rgba(34,197,94,0.2);">💰</div>
+        <div class="ap-info">
+          <div class="ap-name">The Munshi</div>
+          <div class="ap-task idle" id="t2">Queued — awaiting market data</div>
+        </div>
+        <div class="ap-ind ind-idle" id="i2"></div>
+      </div>
+      <div class="ap-row" id="ap3">
+        <div class="ap-avatar" style="background:rgba(168,85,247,0.1);border:0.5px solid rgba(168,85,247,0.2);">✨</div>
+        <div class="ap-info">
+          <div class="ap-name">The Hype</div>
+          <div class="ap-task idle" id="t3">Queued — brand & positioning</div>
+        </div>
+        <div class="ap-ind ind-idle" id="i3"></div>
+      </div>
+      <div class="ap-row" id="ap4">
+        <div class="ap-avatar" style="background:rgba(251,191,36,0.1);border:0.5px solid rgba(251,191,36,0.2);">👑</div>
+        <div class="ap-info">
+          <div class="ap-name">The CVO</div>
+          <div class="ap-task idle" id="t4">Orchestrating final verdict</div>
+        </div>
+        <div class="ap-ind ind-idle" id="i4"></div>
+      </div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-track"><div class="progress-fill" id="pFill"></div></div>
+      <div class="progress-label"><span id="pLabel">Skeptic analyzing...</span><span id="pPct">0%</span></div>
+    </div>
+  </div>
+
+  <!-- REPORT -->
+  <div id="report-screen" class="screen">
+    <div class="report-header">
+      <div class="report-back" onclick="showScreen('search-screen')"><i class="ti ti-arrow-left" style="font-size:14px;" aria-hidden="true"></i> Back</div>
+      <div class="report-actions">
+        <div class="icon-btn"><i class="ti ti-download" aria-hidden="true"></i></div>
+        <div class="icon-btn"><i class="ti ti-share" aria-hidden="true"></i></div>
+      </div>
+    </div>
+    <div class="startup-hero">
+      <div class="startup-logo-lg">🛵</div>
+      <div class="startup-meta">
+        <div class="startup-name-lg" id="reportName">Bykea</div>
+        <div class="startup-tags">
+          <span class="tag">Mobility</span>
+          <span class="tag">Series A</span>
+          <span class="tag">Karachi</span>
+          <span class="tag">B2C</span>
+        </div>
+      </div>
+    </div>
+    <div class="verdict-banner">
+      <div class="verdict-score">
+        <div class="vs-num">712</div>
+        <div class="vs-label">/ 1000</div>
+      </div>
+      <div class="verdict-divider"></div>
+      <div class="verdict-text">
+        <div class="verdict-title">INVEST — with conditions</div>
+        <div class="verdict-sub">Strong PMF in Karachi. Unit economics need tightening before Series B.</div>
+      </div>
+    </div>
+    <div class="r-section-lbl">Dimension scores</div>
+    <div class="dim-grid">
+      <div class="dim-item">
+        <i class="ti ti-map-search dim-icon" aria-hidden="true"></i>
+        <span class="dim-name">Market fit</span>
+        <div class="dim-track"><div class="dim-fill" style="width:78%;background:#6366f1;"></div></div>
+        <span class="dim-score">78</span>
+      </div>
+      <div class="dim-item">
+        <i class="ti ti-coins dim-icon" aria-hidden="true"></i>
+        <span class="dim-name">Financials</span>
+        <div class="dim-track"><div class="dim-fill" style="width:63%;background:#22c55e;"></div></div>
+        <span class="dim-score">63</span>
+      </div>
+      <div class="dim-item">
+        <i class="ti ti-brand-speedtest dim-icon" aria-hidden="true"></i>
+        <span class="dim-name">Brand power</span>
+        <div class="dim-track"><div class="dim-fill" style="width:81%;background:#a855f7;"></div></div>
+        <span class="dim-score">81</span>
+      </div>
+      <div class="dim-item">
+        <i class="ti ti-chess dim-icon" aria-hidden="true"></i>
+        <span class="dim-name">Strategy</span>
+        <div class="dim-track"><div class="dim-fill" style="width:70%;background:#f59e0b;"></div></div>
+        <span class="dim-score">70</span>
+      </div>
+    </div>
+    <div class="r-section-lbl">Key metrics</div>
+    <div class="key-metrics">
+      <div class="km-card">
+        <div class="km-label">Est. valuation</div>
+        <div class="km-value">$28M</div>
+        <div class="km-change" style="color:#22c55e;">+12% YoY</div>
+      </div>
+      <div class="km-card">
+        <div class="km-label">Monthly GMV (PKR)</div>
+        <div class="km-value">₨ 2.4B</div>
+        <div class="km-change" style="color:#22c55e;">Growing</div>
+      </div>
+      <div class="km-card">
+        <div class="km-label">Burn rate / mo</div>
+        <div class="km-value">$180K</div>
+        <div class="km-change" style="color:#ef4444;">High risk</div>
+      </div>
+      <div class="km-card">
+        <div class="km-label">Runway est.</div>
+        <div class="km-value">14 mo</div>
+        <div class="km-change" style="color:#f59e0b;">Watch</div>
+      </div>
+    </div>
+    <div class="r-section-lbl">Agent reports</div>
+    <div class="agent-reports">
+      <div class="ar-card" id="ar1" onclick="toggleCard('ar1')">
+        <div class="ar-header">
+          <div class="ar-avatar" style="background:rgba(239,68,68,0.1);border:0.5px solid rgba(239,68,68,0.2);">🔍</div>
+          <div class="ar-title">
+            <div class="ar-agent-name">The Skeptic</div>
+            <div class="ar-agent-role">Market & competition</div>
+          </div>
+          <span class="ar-badge" style="background:rgba(239,68,68,0.12);color:#ef4444;border:0.5px solid rgba(239,68,68,0.25);">3 red flags</span>
+          <i class="ti ti-chevron-down ar-chevron" id="ch1" aria-hidden="true"></i>
+        </div>
+        <div class="ar-body" id="ab1">
+          <p>Bykea operates in a market with significant structural risk — two-wheel mobility in Pakistan faces regulatory uncertainty and an over-reliance on the Karachi market (68% of GMV from one city).</p>
+          <div class="ar-findings">
+            <div class="finding"><div class="finding-dot" style="background:#ef4444;"></div>InDrive entered PK market Q3 2023 — pricing pressure already visible in Karachi</div>
+            <div class="finding"><div class="finding-dot" style="background:#ef4444;"></div>No clear moat in logistics vs Trax and Leopards Courier</div>
+            <div class="finding"><div class="finding-dot" style="background:#f59e0b;"></div>Lahore expansion stalled since 2022 — geographic concentration risk</div>
+          </div>
+        </div>
+      </div>
+      <div class="ar-card" id="ar2" onclick="toggleCard('ar2')">
+        <div class="ar-header">
+          <div class="ar-avatar" style="background:rgba(34,197,94,0.08);border:0.5px solid rgba(34,197,94,0.2);">💰</div>
+          <div class="ar-title">
+            <div class="ar-agent-name">The Munshi</div>
+            <div class="ar-agent-role">Financial analysis (PKR)</div>
+          </div>
+          <span class="ar-badge" style="background:rgba(251,191,36,0.12);color:#fbbf24;border:0.5px solid rgba(251,191,36,0.25);">Borderline</span>
+          <i class="ti ti-chevron-down ar-chevron" id="ch2" aria-hidden="true"></i>
+        </div>
+        <div class="ar-body" id="ab2">
+          <p>Unit economics are directionally solid but the PKR devaluation (40% since funding) has materially impacted USD-denominated burn vs PKR revenues. CAC/LTV ratio is 1:5.8 — acceptable for this stage.</p>
+          <div class="ar-findings">
+            <div class="finding"><div class="finding-dot" style="background:#22c55e;"></div>LTV:CAC of 5.8x — above the 3x minimum threshold for Series A</div>
+            <div class="finding"><div class="finding-dot" style="background:#ef4444;"></div>FX mismatch: costs in USD, revenue in PKR — runway shrinks 20% in real terms</div>
+            <div class="finding"><div class="finding-dot" style="background:#f59e0b;"></div>No path to profitability document provided — request before term sheet</div>
+          </div>
+        </div>
+      </div>
+      <div class="ar-card" id="ar3" onclick="toggleCard('ar3')">
+        <div class="ar-header">
+          <div class="ar-avatar" style="background:rgba(168,85,247,0.1);border:0.5px solid rgba(168,85,247,0.2);">✨</div>
+          <div class="ar-title">
+            <div class="ar-agent-name">The Hype</div>
+            <div class="ar-agent-role">Brand & positioning</div>
+          </div>
+          <span class="ar-badge" style="background:rgba(34,197,94,0.1);color:#22c55e;border:0.5px solid rgba(34,197,94,0.25);">Strong</span>
+          <i class="ti ti-chevron-down ar-chevron" id="ch3" aria-hidden="true"></i>
+        </div>
+        <div class="ar-body" id="ab3">
+          <p>Bykea has genuine brand equity in Karachi — unprompted recall is high among daily-wage users, which is the target segment. The Urdu-first UX is a real differentiator vs Uber and Careem.</p>
+          <div class="ar-findings">
+            <div class="finding"><div class="finding-dot" style="background:#22c55e;"></div>Top-of-mind in Karachi for affordable mobility — strong word-of-mouth loop</div>
+            <div class="finding"><div class="finding-dot" style="background:#22c55e;"></div>Urdu UX + cash payments = untapped rural expansion potential</div>
+            <div class="finding"><div class="finding-dot" style="background:#f59e0b;"></div>No digital brand presence beyond Karachi — social following weak vs market position</div>
+          </div>
+        </div>
+      </div>
+      <div class="ar-card" id="ar4" onclick="toggleCard('ar4')">
+        <div class="ar-header">
+          <div class="ar-avatar" style="background:rgba(251,191,36,0.1);border:0.5px solid rgba(251,191,36,0.2);">👑</div>
+          <div class="ar-title">
+            <div class="ar-agent-name">The CVO</div>
+            <div class="ar-agent-role">Final verdict</div>
+          </div>
+          <span class="ar-badge" style="background:rgba(99,102,241,0.12);color:#818cf8;border:0.5px solid rgba(99,102,241,0.25);">INVEST ⚡</span>
+          <i class="ti ti-chevron-down ar-chevron" id="ch4" aria-hidden="true"></i>
+        </div>
+        <div class="ar-body" id="ab4">
+          <p>Bykea is a conditional invest. The brand and PMF are real. The financial model needs stress-testing on the FX gap before a term sheet. Recommend requesting 18-month financial projections with PKR-denominated cost structure before proceeding.</p>
+          <div class="ar-findings">
+            <div class="finding"><div class="finding-dot" style="background:#6366f1;"></div>Negotiation lever: FX risk — use to push for better valuation</div>
+            <div class="finding"><div class="finding-dot" style="background:#6366f1;"></div>Due diligence priority: city-level P&L for Karachi vs Lahore</div>
+            <div class="finding"><div class="finding-dot" style="background:#6366f1;"></div>Acquirer note: logistics vertical has standalone value — consider carve-out scenario</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cta-strip">
+      <button class="cta-a" onclick="showScreen('search-screen')">New Analysis</button>
+      <button class="cta-b">Save Report</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function setIntent(el){
+  document.querySelectorAll('.intent-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+function toggleCard(id){
+  const card=document.getElementById(id);
+  const idx=id.replace('ar','');
+  const body=document.getElementById('ab'+idx);
+  const chev=document.getElementById('ch'+idx);
+  const isOpen=card.classList.contains('expanded');
+  document.querySelectorAll('.ar-card').forEach(c=>c.classList.remove('expanded'));
+  document.querySelectorAll('.ar-body').forEach(b=>b.classList.remove('show'));
+  document.querySelectorAll('.ar-chevron').forEach(c=>c.classList.remove('open'));
+  if(!isOpen){card.classList.add('expanded');body.classList.add('show');chev.classList.add('open');}
+}
+function loadReport(name){
+  document.getElementById('reportName').textContent=name;
+  showScreen('report-screen');
+}
+function startAnalysis(){
+  const n=document.getElementById('startupName').value||'Bykea';
+  document.getElementById('loadingName').textContent=n;
+  document.getElementById('reportName').textContent=n;
+  showScreen('loading-screen');
+  const steps=[
+    {d:900,fn:()=>{setStep(1,'Identifying 14 competitors...','running',true,false);}},
+    {d:2000,fn:()=>{setStep(1,'Market analysis done','done',false,true);setStep(2,'Pulling PKR financials...','running',true,false);document.getElementById('pFill').style.width='28%';document.getElementById('pLabel').textContent='Munshi crunching numbers...';document.getElementById('pPct').textContent='28%';}},
+    {d:3400,fn:()=>{setStep(2,'Unit economics checked','done',false,true);setStep(3,'Evaluating brand equity...','running',true,false);document.getElementById('pFill').style.width='55%';document.getElementById('pLabel').textContent='Hype assessing brand...';document.getElementById('pPct').textContent='55%';}},
+    {d:4600,fn:()=>{setStep(3,'Brand report ready','done',false,true);setStep(4,'Writing final verdict...','running',true,false);document.getElementById('pFill').style.width='78%';document.getElementById('pLabel').textContent='CVO deliberating...';document.getElementById('pPct').textContent='78%';}},
+    {d:5800,fn:()=>{setStep(4,'Verdict delivered','done',false,true);document.getElementById('pFill').style.width='100%';document.getElementById('pLabel').textContent='Report ready';document.getElementById('pPct').textContent='100%';}},
+    {d:6600,fn:()=>{showScreen('report-screen');}}
+  ];
+  steps.forEach(s=>setTimeout(s.fn,s.d));
+}
+function setStep(n,text,taskCls,isRunning,isDone){
+  const row=document.getElementById('ap'+n);
+  const task=document.getElementById('t'+n);
+  const ind=document.getElementById('i'+n);
+  row.className='ap-row'+(isRunning?' active':isDone?' done':'');
+  task.textContent=text;
+  task.className='ap-task '+taskCls;
+  ind.className='ap-ind '+(isRunning?'ind-running':isDone?'ind-done':'ind-idle');
+}
+</script>
