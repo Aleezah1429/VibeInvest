@@ -2,10 +2,11 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Ani
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { FileText, FileQuestion, FileEdit, Bike, Search, CircleDollarSign, Sparkles } from 'lucide-react-native';
 
 const DELIVERABLES = [
   {
-    key: 'brief', emoji: '📄', title: 'Investor Brief',
+    key: 'brief', icon: FileText, title: 'Investor Brief',
     sub: '2-page PDF · tl;dr + appendix', color: '#6366f1',
     bullets: [
       'Aura Score: 712 / 1000',
@@ -15,7 +16,7 @@ const DELIVERABLES = [
     ],
   },
   {
-    key: 'questions', emoji: '❓', title: 'Questions to Ask',
+    key: 'questions', icon: FileQuestion, title: 'Questions to Ask',
     sub: '12 sharp questions for the founder', color: '#a855f7',
     bullets: [
       'How do you plan to push margins above 10%?',
@@ -24,7 +25,7 @@ const DELIVERABLES = [
     ],
   },
   {
-    key: 'memo', emoji: '📝', title: 'Deal Memo Draft',
+    key: 'memo', icon: FileEdit, title: 'Deal Memo Draft',
     sub: 'Editable doc · 800 words', color: '#f59e0b',
     bullets: [
       'Thesis · why now',
@@ -124,7 +125,7 @@ export default function ReportScreen() {
         {/* DETAILS OVERVIEW */}
         <View style={styles.startupHero}>
           <View style={styles.startupLogoLg}>
-            <Text style={{ fontSize: 22 }}>🛵</Text>
+            <Bike color="rgba(255,255,255,0.8)" size={24} />
           </View>
           <View style={styles.startupMeta}>
             <Text style={styles.startupNameLg}>{startupName}</Text>
@@ -156,7 +157,7 @@ export default function ReportScreen() {
         <Text style={styles.rSectionLbl}>AGENT REPORTS</Text>
         <View style={styles.agentReports}>
           <AgentCard
-            id={1} icon="🔍" iconBg="rgba(239,68,68,0.1)" iconBorder="rgba(239,68,68,0.2)"
+            id={1} icon={<Search color="#ef4444" size={18} />} iconBg="rgba(239,68,68,0.1)" iconBorder="rgba(239,68,68,0.2)"
             name="The Skeptic" role="Market & competition"
             badge="3 flags" badgeColor="#ef4444" badgeBg="rgba(239,68,68,0.12)" badgeBorder="rgba(239,68,68,0.25)"
             body="Bykea operates in a market with significant structural risk — two-wheel mobility faces regulatory uncertainty."
@@ -167,7 +168,7 @@ export default function ReportScreen() {
             expanded={expandedCard === 1} onToggle={() => toggleCard(1)}
           />
           <AgentCard
-            id={2} icon="💰" iconBg="rgba(34,197,94,0.08)" iconBorder="rgba(34,197,94,0.2)"
+            id={2} icon={<CircleDollarSign color="#22c55e" size={18} />} iconBg="rgba(34,197,94,0.08)" iconBorder="rgba(34,197,94,0.2)"
             name="The Munshi" role="Financial analysis"
             badge="Borderline" badgeColor="#fbbf24" badgeBg="rgba(251,191,36,0.12)" badgeBorder="rgba(251,191,36,0.25)"
             body="Unit economics are solid but PKR devaluation has impacted USD-denominated burn."
@@ -182,7 +183,10 @@ export default function ReportScreen() {
         {/* DELIVERABLES SECTION */}
         <View style={styles.deliverablesHeader}>
           <Text style={styles.rSectionLbl}>DELIVERABLES</Text>
-          <Text style={styles.cvoAuto}>✨ CVO AUTO-GENERATED</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 14 }}>
+            <Sparkles size={10} color="#818cf8" />
+            <Text style={[styles.cvoAuto, { paddingTop: 0 }]}>CVO AUTO-GENERATED</Text>
+          </View>
         </View>
         
         <View style={styles.deliverablesList}>
@@ -196,7 +200,7 @@ export default function ReportScreen() {
                   activeOpacity={0.8}
                 >
                   <View style={styles.delivIcon}>
-                    <Text style={{ fontSize: 20 }}>{d.emoji}</Text>
+                    <d.icon color={d.color} size={20} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.delivTitle}>{d.title}</Text>
@@ -262,7 +266,7 @@ const MetricCard = ({ label, value, change, changeColor }: any) => (
 const AgentCard = ({ icon, iconBg, iconBorder, name, role, badge, badgeColor, badgeBg, badgeBorder, body, findings, expanded, onToggle }: any) => (
   <TouchableOpacity style={[styles.arCard, expanded && styles.arCardExpanded]} onPress={onToggle} activeOpacity={0.8}>
     <View style={styles.arHeader}>
-      <View style={[styles.arAvatar, { backgroundColor: iconBg, borderColor: iconBorder }]}><Text style={{ fontSize: 16 }}>{icon}</Text></View>
+      <View style={[styles.arAvatar, { backgroundColor: iconBg, borderColor: iconBorder }]}>{icon}</View>
       <View style={styles.arTitle}>
         <Text style={styles.arAgentName}>{name}</Text>
         <Text style={styles.arAgentRole}>{role}</Text>

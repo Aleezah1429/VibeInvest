@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Banknote, CircleDollarSign, Crown, Search, Sparkles } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -15,7 +16,7 @@ import { Fonts } from '../constants/theme';
 const AGENTS = [
   {
     key: 'skeptic',
-    emoji: '🔍',
+    icon: Search,
     name: 'The Skeptic',
     role: 'Market researcher',
     color: '#FF6B6B',
@@ -28,7 +29,7 @@ const AGENTS = [
   },
   {
     key: 'munshi',
-    emoji: '💰',
+    icon: CircleDollarSign,
     name: 'The Munshi',
     role: 'Financial analyst (PKR)',
     color: '#D4FF3D',
@@ -41,7 +42,7 @@ const AGENTS = [
   },
   {
     key: 'hype',
-    emoji: '✨',
+    icon: Sparkles,
     name: 'The Hype',
     role: 'Brand guru (Gen Z)',
     color: '#A78BFA',
@@ -54,7 +55,7 @@ const AGENTS = [
   },
   {
     key: 'cvo',
-    emoji: '👑',
+    icon: Crown,
     name: 'The CVO',
     role: 'Chief Vibe Officer',
     color: '#FFC83C',
@@ -196,7 +197,7 @@ function MunshiScene() {
             {tick}<Text style={sceneStyles.burnUnit}>/mo</Text>
           </Text>
         </View>
-        <Text style={{ fontSize: 28 }}>💸</Text>
+        <Banknote color="#110D0D" size={28} />
       </View>
     </View>
   );
@@ -314,7 +315,7 @@ function CVOScene() {
     });
   }, []);
 
-  const nodeEmojis = ['🔍', '💰', '✨'];
+  const nodeIcons = [Search, CircleDollarSign, Sparkles];
   const nodePositions = [
     { top: 20, left: 20 },
     { top: 20, right: 20 },
@@ -337,10 +338,12 @@ function CVOScene() {
           },
         ]}
       />
-      <Text style={sceneStyles.cvoCrown}>👑</Text>
+      <View style={sceneStyles.cvoCrown}>
+        <Crown color="#FFC83C" size={32} />
+      </View>
 
       {/* Orbiting nodes */}
-      {nodeEmojis.map((emoji, i) => (
+      {nodeIcons.map((_, i) => (
         <Animated.View
           key={i}
           style={[
@@ -362,7 +365,10 @@ function CVOScene() {
             },
           ]}
         >
-          <Text style={{ fontSize: 18 }}>{emoji}</Text>
+          {(() => {
+            const IconComp = nodeIcons[i];
+            return <IconComp color="#fff" size={18} />;
+          })()}
         </Animated.View>
       ))}
 
@@ -485,7 +491,7 @@ export default function LoadingScreen() {
       <View style={styles.agentHeader}>
         <View style={styles.agentAvatarWrap}>
           <View style={[styles.agentAvatar, { borderColor: 'rgba(255,255,255,0.15)' }]}>
-            <Text style={{ fontSize: 28 }}>{agent.emoji}</Text>
+            <agent.icon color={agent.color} size={28} />
           </View>
           <View style={[styles.agentDot, { backgroundColor: agent.color }]} />
         </View>

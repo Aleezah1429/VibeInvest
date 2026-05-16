@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { AlertTriangle, ArrowRight, CircleDollarSign, Crown, Search, Sparkles } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -12,11 +13,11 @@ import {
 import { Fonts } from '../constants/theme';
 
 // ── Agent Data ──────────────────────────────────────────────
-const AGENTS: Record<string, { emoji: string; name: string; role: string; color: string }> = {
-  skeptic: { emoji: '🔍', name: 'The Skeptic', role: 'Market researcher', color: '#FF6B6B' },
-  munshi: { emoji: '💰', name: 'The Munshi', role: 'Financial analyst', color: '#D4FF3D' },
-  hype: { emoji: '✨', name: 'The Hype', role: 'Brand guru', color: '#A78BFA' },
-  cvo: { emoji: '👑', name: 'The CVO', role: 'Chief Vibe Officer', color: '#FFC83C' },
+const AGENTS: Record<string, { icon: any; name: string; role: string; color: string }> = {
+  skeptic: { icon: Search, name: 'The Skeptic', role: 'Market researcher', color: '#FF6B6B' },
+  munshi: { icon: CircleDollarSign, name: 'The Munshi', role: 'Financial analyst', color: '#D4FF3D' },
+  hype: { icon: Sparkles, name: 'The Hype', role: 'Brand guru', color: '#A78BFA' },
+  cvo: { icon: Crown, name: 'The CVO', role: 'Chief Vibe Officer', color: '#FFC83C' },
 };
 
 const AGENT_LIST = [AGENTS.skeptic, AGENTS.munshi, AGENTS.hype, AGENTS.cvo];
@@ -92,7 +93,7 @@ function ChatBubble({ message }: { message: ChatMessage }) {
     >
       {/* Avatar */}
       <View style={styles.chatAvatar}>
-        <Text style={{ fontSize: 16 }}>{agent.emoji}</Text>
+        <agent.icon color={agent.color} size={16} />
         <View style={[styles.chatAvatarDot, { backgroundColor: agent.color }]} />
       </View>
 
@@ -111,7 +112,8 @@ function ChatBubble({ message }: { message: ChatMessage }) {
         >
           {message.flag && (
             <View style={styles.flagBadge}>
-              <Text style={styles.flagBadgeText}>⚠ flag</Text>
+              <AlertTriangle size={10} color="#FF6B6B" />
+              <Text style={styles.flagBadgeText}>flag</Text>
             </View>
           )}
           <Text
@@ -189,7 +191,7 @@ export default function HandoffScreen() {
               key={a.name}
               style={[styles.stackAvatar, { marginLeft: i > 0 ? -8 : 0, zIndex: 4 - i }]}
             >
-              <Text style={{ fontSize: 12 }}>{a.emoji}</Text>
+              <a.icon color={a.color} size={12} />
               <View style={[styles.stackDot, { backgroundColor: a.color }]} />
             </View>
           ))}
@@ -225,7 +227,10 @@ export default function HandoffScreen() {
             onPress={handleReveal}
           >
             <Text style={styles.revealText}>Reveal aura score</Text>
-            <Text style={styles.revealIcon}>✨ →</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Sparkles size={16} color="white" />
+              <ArrowRight size={16} color="white" />
+            </View>
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -321,11 +326,12 @@ const styles = StyleSheet.create({
   // Flag badge
   flagBadge: {
     alignSelf: 'flex-start',
+    flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingVertical: 2, paddingHorizontal: 8,
     borderRadius: 4, backgroundColor: 'rgba(255,107,107,0.15)',
     marginBottom: 6,
   },
-  flagBadgeText: { fontSize: 9, fontWeight: '600', color: '#FF6B6B' },
+  flagBadgeText: { fontSize: 9, fontWeight: '600', color: '#FF6B6B', textTransform: 'uppercase' },
 
   // Handoff divider
   handoffRow: {
@@ -357,6 +363,6 @@ const styles = StyleSheet.create({
     gap: 10, paddingVertical: 17,
     backgroundColor: '#6366f1', borderRadius: 50,
   },
-  revealText: { fontSize: 15, fontWeight: '700', color: '#0A0A0C' },
+  revealText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   revealIcon: { fontSize: 18 },
 });
