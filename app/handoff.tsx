@@ -9,13 +9,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Fonts } from '../constants/theme';
 
 // ── Agent Data ──────────────────────────────────────────────
 const AGENTS: Record<string, { emoji: string; name: string; role: string; color: string }> = {
   skeptic: { emoji: '🔍', name: 'The Skeptic', role: 'Market researcher', color: '#FF6B6B' },
-  munshi:  { emoji: '💰', name: 'The Munshi',  role: 'Financial analyst', color: '#D4FF3D' },
-  hype:    { emoji: '✨', name: 'The Hype',    role: 'Brand guru',        color: '#A78BFA' },
-  cvo:     { emoji: '👑', name: 'The CVO',     role: 'Chief Vibe Officer', color: '#FFC83C' },
+  munshi: { emoji: '💰', name: 'The Munshi', role: 'Financial analyst', color: '#D4FF3D' },
+  hype: { emoji: '✨', name: 'The Hype', role: 'Brand guru', color: '#A78BFA' },
+  cvo: { emoji: '👑', name: 'The CVO', role: 'Chief Vibe Officer', color: '#FFC83C' },
 };
 
 const AGENT_LIST = [AGENTS.skeptic, AGENTS.munshi, AGENTS.hype, AGENTS.cvo];
@@ -223,7 +224,7 @@ export default function HandoffScreen() {
             activeOpacity={0.85}
             onPress={handleReveal}
           >
-            <Text style={styles.revealText}>reveal aura score</Text>
+            <Text style={styles.revealText}>Reveal aura score</Text>
             <Text style={styles.revealIcon}>✨ →</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -246,14 +247,14 @@ const styles = StyleSheet.create({
   },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   liveDot: {
-    width: 6, height: 6, borderRadius: 3, backgroundColor: '#D4FF3D',
+    width: 6, height: 6, borderRadius: 3, backgroundColor: '#818cf8',
   },
   eyebrow: {
     fontSize: 10, fontWeight: '600', letterSpacing: 1,
     color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase',
   },
   skipText: {
-    fontFamily: 'monospace', fontSize: 12, color: 'rgba(255,255,255,0.4)',
+    fontFamily: Fonts.mono, fontSize: 12, color: 'rgba(255,255,255,0.4)',
   },
   headerMid: {
     flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10,
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  inRoomText: { fontFamily: 'monospace', fontSize: 10, color: 'rgba(255,255,255,0.4)' },
+  inRoomText: { fontFamily: Fonts.mono, fontSize: 10, color: 'rgba(255,255,255,0.4)' },
   avatarStack: { flexDirection: 'row', marginTop: 10 },
   stackAvatar: {
     width: 24, height: 24, borderRadius: 7,
@@ -299,7 +300,7 @@ const styles = StyleSheet.create({
   },
   chatMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 },
   chatName: { fontSize: 12, fontWeight: '600', color: '#fff' },
-  chatRole: { fontFamily: 'monospace', fontSize: 9, color: 'rgba(255,255,255,0.35)' },
+  chatRole: { fontFamily: Fonts.mono, fontSize: 9, color: 'rgba(255,255,255,0.35)' },
 
   // Bubble
   bubble: {
@@ -309,7 +310,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10, paddingHorizontal: 14,
   },
   bubbleFinal: {
-    backgroundColor: '#D4FF3D', borderColor: '#D4FF3D',
+    backgroundColor: '#6366f1', borderColor: '#6366f1',
   },
   bubbleFlagged: {
     borderColor: 'rgba(255,107,107,0.45)',
@@ -336,14 +337,14 @@ const styles = StyleSheet.create({
     borderWidth: 0.5, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.12)',
   },
   handoffText: {
-    fontFamily: 'monospace', fontSize: 9, letterSpacing: 0.5,
+    fontFamily: Fonts.mono, fontSize: 9, letterSpacing: 0.5,
     color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase',
   },
 
   // Typing
   typingRow: { flexDirection: 'row', gap: 10, paddingVertical: 6 },
   typingDots: {
-    fontFamily: 'monospace', fontSize: 12, color: 'rgba(255,255,255,0.25)',
+    fontFamily: Fonts.mono, fontSize: 12, color: 'rgba(255,255,255,0.25)',
   },
 
   // CTA
@@ -354,7 +355,7 @@ const styles = StyleSheet.create({
   revealBtn: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     gap: 10, paddingVertical: 17,
-    backgroundColor: '#D4FF3D', borderRadius: 50,
+    backgroundColor: '#6366f1', borderRadius: 50,
   },
   revealText: { fontSize: 15, fontWeight: '700', color: '#0A0A0C' },
   revealIcon: { fontSize: 18 },

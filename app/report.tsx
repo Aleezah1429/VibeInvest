@@ -296,10 +296,10 @@ const styles = StyleSheet.create({
   iconBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   
   // Score Section
-  scoreSection: { alignItems: 'center', marginTop: 30, marginBottom: 20 },
+  scoreSection: { alignItems: 'center', marginTop: 60, marginBottom: 20 },
   scoreEyebrow: { fontSize: 11, fontWeight: '600', color: '#818cf8', letterSpacing: 1.5, marginBottom: 16 },
-  scoreHero: { alignItems: 'center', justifyContent: 'center' },
-  glow: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(99,102,241,0.15)', transform: [{ scale: 1.5 }] },
+  scoreHero: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
+  glow: { position: 'absolute', width: 280, height: 280, borderRadius: 140, backgroundColor: 'rgba(99,102,241,0.15)', top: '50%', left: '50%', transform: [{ translateX: -140 }, { translateY: -140 }] },
   bigScore: { fontSize: 84, fontWeight: '800', color: '#fff', letterSpacing: -2 },
   scoreMax: { fontSize: 14, color: 'rgba(255,255,255,0.4)', marginTop: -10, letterSpacing: 1 },
   

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -7,9 +7,9 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  ScrollView,
+  View
 } from 'react-native';
+import { Fonts } from '../constants/theme';
 
 // ── Agent Data ──────────────────────────────────────────────
 const AGENTS = [
@@ -568,7 +568,7 @@ const sceneStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,107,107,0.03)',
   },
   intelLine: {
-    fontFamily: 'monospace', fontSize: 10, lineHeight: 18,
+    fontFamily: Fonts.mono, fontSize: 10, lineHeight: 18,
     color: 'rgba(255,255,255,0.4)',
   },
   flagLine: { color: '#FF6B6B', fontWeight: '600' },
@@ -580,8 +580,8 @@ const sceneStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   calcLine: {
-    fontFamily: 'monospace', fontSize: 10.5, lineHeight: 18,
-    color: 'rgba(212,255,61,0.65)',
+    fontFamily: Fonts.mono, fontSize: 10.5, lineHeight: 18,
+    color: 'rgba(34,197,94,0.65)',
   },
   calcNeg: { color: '#FF6B6B' },
   calcTotal: { color: '#D4FF3D', fontWeight: '600' },
@@ -592,7 +592,7 @@ const sceneStyles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   burnLabel: {
-    fontFamily: 'monospace', fontSize: 9, letterSpacing: 1,
+    fontFamily: Fonts.mono, fontSize: 9, letterSpacing: 1,
     color: 'rgba(0,0,0,0.5)', textTransform: 'uppercase',
   },
   burnValue: { fontSize: 24, fontWeight: '700', color: '#0A0A0C', marginTop: 2 },
@@ -615,7 +615,7 @@ const sceneStyles = StyleSheet.create({
     position: 'absolute', top: 14, left: 14, right: 14,
     flexDirection: 'row', justifyContent: 'space-between',
   },
-  hypeStat: { fontFamily: 'monospace', fontSize: 10, color: 'rgba(167,139,250,0.7)' },
+  hypeStat: { fontFamily: Fonts.mono, fontSize: 10, color: 'rgba(167,139,250,0.7)' },
   hypeBottom: {
     position: 'absolute', bottom: 14, left: 14, right: 14,
     flexDirection: 'row', justifyContent: 'space-between',
@@ -645,7 +645,7 @@ const sceneStyles = StyleSheet.create({
     position: 'absolute', top: 14, left: 14, right: 14,
     flexDirection: 'row', justifyContent: 'space-between',
   },
-  cvoStatText: { fontFamily: 'monospace', fontSize: 10, color: 'rgba(255,255,255,0.35)' },
+  cvoStatText: { fontFamily: Fonts.mono, fontSize: 10, color: 'rgba(255,255,255,0.35)' },
   cvoBottom: {
     position: 'absolute', bottom: 14, left: 14, right: 14,
     flexDirection: 'row', justifyContent: 'space-between',
@@ -663,7 +663,7 @@ const styles = StyleSheet.create({
     fontSize: 10, fontWeight: '600', letterSpacing: 1,
     color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase',
   },
-  counter: { fontFamily: 'monospace', fontSize: 11, color: 'rgba(255,255,255,0.35)' },
+  counter: { fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.35)' },
   targetRow: { paddingHorizontal: 20, marginTop: 14 },
   targetBadge: {
     alignSelf: 'flex-start',
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
     borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  targetText: { fontFamily: 'monospace', fontSize: 11, color: 'rgba(255,255,255,0.5)' },
+  targetText: { fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.5)' },
   agentHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingHorizontal: 20, marginTop: 18,
@@ -704,14 +704,14 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: '100%', borderRadius: 99 },
   progressName: {
-    fontFamily: 'monospace', fontSize: 9, marginTop: 4,
+    fontFamily: Fonts.mono, fontSize: 9, marginTop: 4,
     letterSpacing: 0.5, textTransform: 'uppercase',
   },
   bottomBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingVertical: 20,
   },
-  hintText: { fontFamily: 'monospace', fontSize: 11, color: 'rgba(255,255,255,0.25)' },
+  hintText: { fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.25)' },
   skipBtn: {
     paddingVertical: 6, paddingHorizontal: 14,
     borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.08)',
