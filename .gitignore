@@ -31,13 +31,27 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.*
 .env*.local
+
+# local development artifacts
+.venv
+venv/
+.agents/
+.temp/
+.vscode/
 
 # typescript
 *.tsbuildinfo
 
 app-example
 
+# generated frontend / agent folders
+frontend/
+google-adk-agent/
+
 # generated native folders
 /ios
 /android
+.api/env
