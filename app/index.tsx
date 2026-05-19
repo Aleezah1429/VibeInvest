@@ -5,6 +5,7 @@ import {
   Animated,
   Easing,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -610,18 +611,49 @@ function AuraRing({ score, max = 1000 }: { score: number; max?: number }) {
       </Defs>
       <Circle cx={74} cy={74} r={r} stroke="rgba(255,255,255,0.06)" strokeWidth={6} fill="none" />
       {score > 0 && (
-        <Circle
-          cx={74}
-          cy={74}
-          r={r}
-          stroke="url(#auraRing)"
-          strokeWidth={6}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={C0}
-          strokeDashoffset={offset}
-          transform="rotate(-90 74 74)"
-        />
+        <>
+          {/* Two wider, translucent halo strokes simulate the CSS
+              `filter: drop-shadow(0 0 6px rgba(149,80,238,0.6))` glow that
+              RN's SVG primitives can't render natively. */}
+          <Circle
+            cx={74}
+            cy={74}
+            r={r}
+            stroke="#9550ee"
+            strokeWidth={18}
+            opacity={0.12}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={C0}
+            strokeDashoffset={offset}
+            transform="rotate(-90 74 74)"
+          />
+          <Circle
+            cx={74}
+            cy={74}
+            r={r}
+            stroke="#9550ee"
+            strokeWidth={11}
+            opacity={0.28}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={C0}
+            strokeDashoffset={offset}
+            transform="rotate(-90 74 74)"
+          />
+          <Circle
+            cx={74}
+            cy={74}
+            r={r}
+            stroke="url(#auraRing)"
+            strokeWidth={6}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={C0}
+            strokeDashoffset={offset}
+            transform="rotate(-90 74 74)"
+          />
+        </>
       )}
     </Svg>
   );
@@ -765,6 +797,159 @@ function AuraScoreCard({ report }: { report: SavedReport }) {
 }
 
 // ─── trending (empty state) ────────────────────────────────────────────────
+// ─── Quick Insights (populated dashboard only) ─────────────────────────────
+type Insight = {
+  tag: string;
+  title: string;
+  subtitle: string;
+  source: string;
+  accent: string;
+  url: string;
+};
+
+const INSIGHTS: Insight[] = [
+  {
+    tag: 'CAPITAL',
+    title: 'Q1 2026 deal flow',
+    subtitle: 'Fintech took 34% of $62M raised; cross-border revenue is the new bar.',
+    source: 'Startup.pk · May 2026',
+    accent: '#9550ee',
+    url: 'https://startup.pk/where-startup-capital-is-actually-going-in-pakistan-right-now/',
+  },
+  {
+    tag: 'FINANCING',
+    title: 'Hybrid debt + equity surge',
+    subtitle: 'Hybrid rounds jumped $1M → $66M — 89% of 2025 total funding.',
+    source: 'Brecorder · Feb 2026',
+    accent: '#c79bff',
+    url: 'https://www.brecorder.com/news/40407474',
+  },
+  {
+    tag: 'FOUNDERS',
+    title: 'Female-led founder wave',
+    subtitle: '8 of 11 disclosed 2025 deals had female founders or co-founders.',
+    source: 'Brecorder · Jan 2026',
+    accent: '#FFC83C',
+    url: 'https://www.brecorder.com/news/40402392',
+  },
+  {
+    tag: 'GAP',
+    title: 'India is 160× ahead',
+    subtitle: 'Pakistan ~$1B raised since 2015 vs India $160B+ in the same period.',
+    source: 'TechJuice · Apr 2026',
+    accent: '#ff5d6c',
+    url: 'https://www.techjuice.pk/pakistans-startups-have-a-159-billion-problem-here-is-why/',
+  },
+  {
+    tag: 'RECOVERY',
+    title: 'Equity funding ticks up',
+    subtitle: '$36.6M equity in 2025 (+63% YoY) — still far below the 2021 peak.',
+    source: 'PhoneWorld · Jan 2026',
+    accent: '#3ddc97',
+    url: 'https://www.phoneworld.com.pk/how-pakistans-startup-ecosystem-can-thrive-in-2026/',
+  },
+  {
+    tag: 'ROUNDS',
+    title: 'Haball, Trukkr, Shadiyana',
+    subtitle: '$52M Pre-A · $10M · $800K — three names to watch in 2026.',
+    source: 'Daftarkhwan · Feb 2026',
+    accent: '#A78BFA',
+    url: 'https://www.daftarkhwan.com/post/top-pakistani-startups-to-watch-in-2026',
+  },
+  {
+    tag: 'TOP 10',
+    title: 'Flagship roster',
+    subtitle: 'Abhi $57.8M · PostEx $15.9M · Tazah $6.5M — scaled players.',
+    source: 'Startup Network · Feb 2026',
+    accent: '#D4FF3D',
+    url: 'https://startupnetwork.pk/10-pakistans-top-startups-you-must-know-about/',
+  },
+  {
+    tag: 'POSTMORTEM',
+    title: 'Airlift cautionary tale',
+    subtitle: 'Raised ~$109M Series B, shut 2022 — capital ≠ survival.',
+    source: 'ArabFounders · Feb 2026',
+    accent: '#f0b34a',
+    url: 'https://arabfounders.net/en/top-startups-pakistan-2026-2/',
+  },
+  {
+    tag: 'TRACXN',
+    title: '22,596 startups tracked',
+    subtitle: '~1,000 funded · $4.77B cumulative · $93.5M YTD 2026.',
+    source: 'Tracxn · May 2026',
+    accent: '#9550ee',
+    url: 'https://tracxn.com/d/geographies/pakistan/__SNCx2XH4A3PyUUpzsO6Kmz4y9f8Z2LFQWK1jSZrVm98',
+  },
+  {
+    tag: 'POLICY',
+    title: 'PSF "last cheque"',
+    subtitle: '10–30% equity-free capital, disbursed after a VC commits.',
+    source: 'MoITT · Pakistan Startup Fund',
+    accent: '#c79bff',
+    url: 'https://moitt.gov.pk/Detail/NjZjZmUyZDQtNDU5MS00NzIzLTgyNTAtNmIzY2Y4ODFjODIz',
+  },
+];
+
+function InsightCard({ insight }: { insight: Insight }) {
+  const open = () => {
+    Linking.openURL(insight.url).catch(() => {
+      Alert.alert('Could not open link', insight.url);
+    });
+  };
+  return (
+    <TouchableOpacity onPress={open} activeOpacity={0.85} style={s.insightOuter}>
+      <LinearGradient
+        colors={['rgba(255,255,255,0.045)', 'rgba(255,255,255,0.012)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={s.insightCard}
+      >
+        <View pointerEvents="none" style={[s.insightGlow, { backgroundColor: insight.accent }]} />
+        <View style={s.insightHead}>
+          <View
+            style={[
+              s.insightTag,
+              { backgroundColor: `${insight.accent}1f`, borderColor: `${insight.accent}55` },
+            ]}
+          >
+            <Text style={[s.insightTagText, { color: insight.accent }]}>{insight.tag}</Text>
+          </View>
+          <Sparkles size={11} color={T.faint} />
+        </View>
+        <Text style={s.insightTitle} numberOfLines={2}>{insight.title}</Text>
+        <Text style={s.insightSubtitle} numberOfLines={3}>{insight.subtitle}</Text>
+        <View style={s.insightFoot}>
+          <Text style={s.insightSource} numberOfLines={1}>{insight.source}</Text>
+          <Text style={s.insightArrow}>→</Text>
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+}
+
+function QuickInsights() {
+  return (
+    <View>
+      <View style={{ paddingHorizontal: 20 }}>
+        <SectionHead
+          eyebrow="◢ INTELLIGENCE"
+          title="Quick insights"
+          meta={`${INSIGHTS.length} SOURCES`}
+        />
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 14, gap: 10 }}
+      >
+        {INSIGHTS.map((ix) => (
+          <InsightCard key={ix.url} insight={ix} />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 const TRENDING = [
   { name: 'Bazaar Tech', sector: 'B2B Retail', stat: '↑ 142%', heat: 'HOT' as const, logo: require('../assets/images/bazaar.png') },
   { name: 'Retailo', sector: 'Distribution', stat: '↑ 21%', heat: 'NEW' as const, logo: require('../assets/images/retailo.png') },
@@ -1026,6 +1211,8 @@ export default function DashboardScreen() {
             <View style={{ height: 22 }} />
             {latestReport && <AuraScoreCard report={latestReport} />}
             <View style={{ height: 22 }} />
+            <QuickInsights />
+            <View style={{ height: 6 }} />
             <RecentList
               reports={reports}
               onPick={(_, name) => router.push({ pathname: '/report', params: { name } })}
@@ -1481,6 +1668,83 @@ const s = StyleSheet.create({
     fontSize: 9.5,
     letterSpacing: 0.8,
     fontWeight: '600',
+  },
+
+  // ── insight cards (Quick Insights, populated state)
+  insightOuter: {
+    width: 244,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: T.line2,
+    overflow: 'hidden',
+  },
+  insightCard: {
+    padding: 14,
+    minHeight: 160,
+    position: 'relative',
+  },
+  insightGlow: {
+    position: 'absolute',
+    top: -30,
+    right: -30,
+    width: 80,
+    height: 80,
+    borderRadius: 80,
+    opacity: 0.08,
+  },
+  insightHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  insightTag: {
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    borderRadius: 5,
+    borderWidth: 1,
+  },
+  insightTagText: {
+    fontFamily: MONO,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    fontWeight: '600',
+  },
+  insightTitle: {
+    color: T.ink,
+    fontSize: 14.5,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+    marginBottom: 6,
+  },
+  insightSubtitle: {
+    color: T.dim,
+    fontSize: 12,
+    lineHeight: 17,
+    flex: 1,
+  },
+  insightFoot: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: T.line2,
+    borderStyle: 'dashed',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  insightSource: {
+    fontFamily: MONO,
+    fontSize: 9.5,
+    color: T.faint,
+    letterSpacing: 0.4,
+    flex: 1,
+  },
+  insightArrow: {
+    fontFamily: MONO,
+    fontSize: 11,
+    color: T.purple,
+    marginLeft: 6,
   },
 
   // ── trending

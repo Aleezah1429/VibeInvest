@@ -326,18 +326,47 @@ function AuraRing({ score, max = 1000, size = 168 }: { score: number; max?: numb
       </Defs>
       <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.06)" strokeWidth={6} fill="none" />
       {score > 0 && (
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          stroke="url(#auraRingReport)"
-          strokeWidth={6}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={C0}
-          strokeDashoffset={offset}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
+        <>
+          {/* Halo layers for the purple glow (RN-SVG has no drop-shadow). */}
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke="#9550ee"
+            strokeWidth={20}
+            opacity={0.12}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={C0}
+            strokeDashoffset={offset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke="#9550ee"
+            strokeWidth={12}
+            opacity={0.28}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={C0}
+            strokeDashoffset={offset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke="url(#auraRingReport)"
+            strokeWidth={6}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={C0}
+            strokeDashoffset={offset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        </>
       )}
     </Svg>
   );
