@@ -3,6 +3,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { FileText, FileQuestion, FileEdit, Bike, Search, CircleDollarSign, Sparkles } from 'lucide-react-native';
+import { useDueDiligence } from '../context/DueDiligenceContext';
+
 
 const DELIVERABLES = [
   {
@@ -40,6 +42,7 @@ export default function ReportScreen() {
   const router = useRouter();
   const { name } = useLocalSearchParams<{ name: string }>();
   const startupName = name || 'Bykea';
+  const { results, finalScore } = useDueDiligence();
 
   const [expandedCard, setExpandedCard] = useState<number | null>(1);
   const [expandedDeliv, setExpandedDeliv] = useState<string | null>('brief');
@@ -47,10 +50,31 @@ export default function ReportScreen() {
   const [score, setScore] = useState(0);
   const stampAnim = useRef(new Animated.Value(0)).current;
 
+  const targetScore = finalScore !== null ? finalScore : 712;
+
+  let verdict = 'INVEST';
+  let verdictSub = 'WITH CONDITIONS';
+  let stampColor = '#22c55e'; // Green for invest
+
+  if (finalScore !== null) {
+    if (finalScore >= 800) {
+      verdict = 'INVEST';
+      verdictSub = 'WITH CONDITIONS';
+      stampColor = '#22c55e';
+    } else if (finalScore >= 600) {
+      verdict = 'WATCH';
+      verdictSub = 'MONITOR RISK';
+      stampColor = '#f59e0b';
+    } else {
+      verdict = 'PASS';
+      verdictSub = 'HIGH RISK';
+      stampColor = '#ef4444';
+    }
+  }
+
   useEffect(() => {
-    // Animate score from 0 to 712
+    // Animate score from 0 to targetScore
     let start = 0;
-    const target = 712;
     const duration = 1500;
     const startTime = Date.now();
     
@@ -58,7 +82,7 @@ export default function ReportScreen() {
       const now = Date.now();
       const progress = Math.min((now - startTime) / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
-      setScore(Math.round(eased * target));
+      setScore(Math.round(eased * targetScore));
       
       if (progress < 1) {
         requestAnimationFrame(animateScore);
@@ -72,10 +96,11 @@ export default function ReportScreen() {
       }
     };
     requestAnimationFrame(animateScore);
-  }, []);
+  }, [targetScore]);
 
   const toggleCard = (id: number) => setExpandedCard(expandedCard === id ? null : id);
   const toggleDeliv = (key: string) => setExpandedDeliv(expandedDeliv === key ? null : key);
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -107,6 +132,7 @@ export default function ReportScreen() {
           <Animated.View style={[
             styles.stampContainer,
             {
+              borderColor: stampColor,
               opacity: stampAnim,
               transform: [
                 { scale: stampAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 1] }) },
@@ -114,11 +140,11 @@ export default function ReportScreen() {
               ]
             }
           ]}>
-            <Text style={styles.stampText}>INVEST</Text>
+            <Text style={[styles.stampText, { color: stampColor }]}>{verdict}</Text>
           </Animated.View>
           
           <Animated.View style={[styles.stampSubTextContainer, { opacity: stampAnim }]}>
-             <Text style={styles.stampSubText}>WITH CONDITIONS</Text>
+             <Text style={[styles.stampSubText, { color: stampColor }]}>{verdictSub}</Text>
           </Animated.View>
         </View>
 
@@ -156,28 +182,66 @@ export default function ReportScreen() {
 
         <Text style={styles.rSectionLbl}>AGENT REPORTS</Text>
         <View style={styles.agentReports}>
-          <AgentCard
-            id={1} icon={<Search color="#ef4444" size={18} />} iconBg="rgba(239,68,68,0.1)" iconBorder="rgba(239,68,68,0.2)"
-            name="The Skeptic" role="Market & competition"
-            badge="3 flags" badgeColor="#ef4444" badgeBg="rgba(239,68,68,0.12)" badgeBorder="rgba(239,68,68,0.25)"
-            body="Bykea operates in a market with significant structural risk — two-wheel mobility faces regulatory uncertainty."
-            findings={[
-              { text: "InDrive entered PK market Q3 2023", color: "#ef4444" },
-              { text: "Lahore expansion stalled since 2022", color: "#f59e0b" }
-            ]}
-            expanded={expandedCard === 1} onToggle={() => toggleCard(1)}
-          />
-          <AgentCard
-            id={2} icon={<CircleDollarSign color="#22c55e" size={18} />} iconBg="rgba(34,197,94,0.08)" iconBorder="rgba(34,197,94,0.2)"
-            name="The Munshi" role="Financial analysis"
-            badge="Borderline" badgeColor="#fbbf24" badgeBg="rgba(251,191,36,0.12)" badgeBorder="rgba(251,191,36,0.25)"
-            body="Unit economics are solid but PKR devaluation has impacted USD-denominated burn."
-            findings={[
-              { text: "LTV:CAC of 5.8x — above minimum threshold", color: "#22c55e" },
-              { text: "FX mismatch: costs in USD, revenue in PKR", color: "#ef4444" }
-            ]}
-            expanded={expandedCard === 2} onToggle={() => toggleCard(2)}
-          />
+          {(() => {
+            const skepticData = results.find(r => r.agent.toLowerCase().includes('skeptic'));
+            const munshiData = results.find(r => r.agent.toLowerCase().includes('munshi'));
+            const hypeData = results.find(r => r.agent.toLowerCase().includes('hype'));
+            const cvoData = results.find(r => r.agent.toLowerCase().includes('cvo'));
+
+            const skepticBody = skepticData?.summary || "Bykea operates in a market with significant structural risk — two-wheel mobility faces regulatory uncertainty.";
+            const munshiBody = munshiData?.summary || "Unit economics are solid but PKR devaluation has impacted USD-denominated burn.";
+            const hypeBody = hypeData?.summary || "Strong brand signals, founder credibility, and customer acquisition viral loops.";
+            const cvoBody = cvoData?.summary || "Synthesized analysis indicates a strong candidate for conditional investment.";
+
+            return (
+              <>
+                <AgentCard
+                  id={1} icon={<Search color="#ef4444" size={18} />} iconBg="rgba(239,68,68,0.1)" iconBorder="rgba(239,68,68,0.2)"
+                  name="The Skeptic" role="Market & competition"
+                  badge={skepticData ? "Gathered" : "3 flags"} badgeColor={skepticData ? "#22c55e" : "#ef4444"} badgeBg={skepticData ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.12)"} badgeBorder={skepticData ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.25)"}
+                  body={skepticBody}
+                  findings={[
+                    { text: "InDrive entered PK market Q3 2023", color: "#ef4444" },
+                    { text: "Lahore expansion stalled since 2022", color: "#f59e0b" }
+                  ]}
+                  expanded={expandedCard === 1} onToggle={() => toggleCard(1)}
+                />
+                <AgentCard
+                  id={2} icon={<CircleDollarSign color="#22c55e" size={18} />} iconBg="rgba(34,197,94,0.08)" iconBorder="rgba(34,197,94,0.2)"
+                  name="The Munshi" role="Financial analysis"
+                  badge={munshiData ? "Calculated" : "Borderline"} badgeColor={munshiData ? "#22c55e" : "#fbbf24"} badgeBg={munshiData ? "rgba(34,197,94,0.1)" : "rgba(251,191,36,0.12)"} badgeBorder={munshiData ? "rgba(34,197,94,0.2)" : "rgba(251,191,36,0.25)"}
+                  body={munshiBody}
+                  findings={[
+                    { text: "LTV:CAC of 5.8x — above minimum threshold", color: "#22c55e" },
+                    { text: "FX mismatch: costs in USD, revenue in PKR", color: "#ef4444" }
+                  ]}
+                  expanded={expandedCard === 2} onToggle={() => toggleCard(2)}
+                />
+                <AgentCard
+                  id={3} icon={<Sparkles color="#a855f7" size={18} />} iconBg="rgba(168,85,247,0.08)" iconBorder="rgba(168,85,247,0.2)"
+                  name="The Hype" role="Brand & sentiment"
+                  badge={hypeData ? "Analyzed" : "Slaying"} badgeColor={hypeData ? "#22c55e" : "#a855f7"} badgeBg={hypeData ? "rgba(34,197,94,0.1)" : "rgba(168,85,247,0.12)"} badgeBorder={hypeData ? "rgba(34,197,94,0.2)" : "rgba(168,85,247,0.25)"}
+                  body={hypeBody}
+                  findings={[
+                    { text: "Founder Twitter footprint: 12k highly engaged", color: "#22c55e" },
+                    { text: "Product reviews positive, minor app crash reports", color: "#fbbf24" }
+                  ]}
+                  expanded={expandedCard === 3} onToggle={() => toggleCard(3)}
+                />
+                <AgentCard
+                  id={4} icon={<Ionicons name="crown-outline" color="#fbbf24" size={18} />} iconBg="rgba(251,191,36,0.08)" iconBorder="rgba(251,191,36,0.2)"
+                  name="The CVO" role="Verdict & scoring"
+                  badge={cvoData ? "Decision Locked" : "Synthesizing"} badgeColor={cvoData ? "#22c55e" : "#fbbf24"} badgeBg={cvoData ? "rgba(34,197,94,0.1)" : "rgba(251,191,36,0.12)"} badgeBorder={cvoData ? "rgba(34,197,94,0.2)" : "rgba(251,191,36,0.25)"}
+                  body={cvoBody}
+                  findings={[
+                    { text: `Final score computed: ${targetScore}/1000`, color: "#22c55e" },
+                    { text: "Risk adjusted recommendations generated", color: "#6366f1" }
+                  ]}
+                  expanded={expandedCard === 4} onToggle={() => toggleCard(4)}
+                />
+              </>
+            );
+          })()}
         </View>
 
         {/* DELIVERABLES SECTION */}

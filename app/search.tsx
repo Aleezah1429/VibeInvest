@@ -2,16 +2,21 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, Scro
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { useDueDiligence } from '../context/DueDiligenceContext';
 
 export default function SearchScreen() {
   const router = useRouter();
+  const { startAnalysis } = useDueDiligence();
   const [intent, setIntent] = useState('Invest');
   const intents = ['Invest', 'Acquire', 'Research', 'Partner'];
   const [startupName, setStartupName] = useState('');
 
   const handleAnalyze = () => {
-    router.push({ pathname: '/loading', params: { name: startupName || 'Bykea' } });
+    const name = startupName || 'Bykea';
+    startAnalysis(name);
+    router.push({ pathname: '/loading', params: { name } });
   };
+
 
   return (
     <SafeAreaView style={styles.container}>

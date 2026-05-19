@@ -11,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import { Fonts } from '../constants/theme';
+import { useDueDiligence } from '../context/DueDiligenceContext';
+
 
 // ── Agent Data ──────────────────────────────────────────────
 const AGENTS: Record<string, { icon: any; name: string; role: string; color: string }> = {
@@ -135,16 +137,43 @@ export default function HandoffScreen() {
   const router = useRouter();
   const { name } = useLocalSearchParams<{ name: string }>();
   const startupName = name || 'Bykea';
+  const { results } = useDueDiligence();
 
   const [step, setStep] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
 
+  // Dynamically build the chat script based on real results
+  const chatScript: ChatMessage[] = [];
+  const skeptic = results.find(r => r.agent.toLowerCase().includes('skeptic'));
+  const munshi = results.find(r => r.agent.toLowerCase().includes('munshi'));
+  const hype = results.find(r => r.agent.toLowerCase().includes('hype'));
+  const cvo = results.find(r => r.agent.toLowerCase().includes('cvo'));
+
+  if (skeptic) {
+    chatScript.push({ agent: 'skeptic', text: skeptic.summary });
+    chatScript.push({ handoff: 'The Skeptic ➔ The Munshi' });
+  }
+  if (munshi) {
+    chatScript.push({ agent: 'munshi', text: munshi.summary });
+    chatScript.push({ handoff: 'The Munshi ➔ The Hype' });
+  }
+  if (hype) {
+    chatScript.push({ agent: 'hype', text: hype.summary });
+    chatScript.push({ handoff: 'All Reports ➔ The CVO' });
+  }
+  if (cvo) {
+    chatScript.push({ agent: 'cvo', text: cvo.summary });
+    chatScript.push({ agent: 'cvo', text: 'Verdict locked in! Click below to reveal the Aura Score.', final: true });
+  }
+
+  const activeScript = chatScript.length > 0 ? chatScript : CHAT_SCRIPT;
+
   useEffect(() => {
-    if (step >= CHAT_SCRIPT.length) return;
+    if (step >= activeScript.length) return;
     const delay = step === 0 ? 400 : 950;
     const t = setTimeout(() => setStep((s) => s + 1), delay);
     return () => clearTimeout(t);
-  }, [step]);
+  }, [step, activeScript.length]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -152,8 +181,8 @@ export default function HandoffScreen() {
     }, 100);
   }, [step]);
 
-  const messages = CHAT_SCRIPT.slice(0, step);
-  const isDone = step >= CHAT_SCRIPT.length;
+  const messages = activeScript.slice(0, step);
+  const isDone = step >= activeScript.length;
 
   const handleReveal = () => {
     router.replace({ pathname: '/report', params: { name: startupName } });
@@ -162,6 +191,7 @@ export default function HandoffScreen() {
   const handleSkip = () => {
     router.replace({ pathname: '/report', params: { name: startupName } });
   };
+
 
   return (
     <SafeAreaView style={styles.container}>

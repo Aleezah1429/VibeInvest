@@ -11,6 +11,8 @@ import {
   View
 } from 'react-native';
 import { Fonts } from '../constants/theme';
+import { useDueDiligence } from '../context/DueDiligenceContext';
+
 
 // ── Agent Data ──────────────────────────────────────────────
 const AGENTS = [
@@ -419,6 +421,7 @@ export default function LoadingScreen() {
   const router = useRouter();
   const { name } = useLocalSearchParams<{ name: string }>();
   const startupName = name || 'Bykea';
+  const { results } = useDueDiligence();
 
   const [agentIdx, setAgentIdx] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -432,38 +435,53 @@ export default function LoadingScreen() {
     router.replace({ pathname: '/report', params: { name: startupName } });
   }, [router, startupName]);
 
+  // Slow drift animation for current agent loader
   useEffect(() => {
-    const dur = 3200;
-    const start = Date.now();
-    let rafId: ReturnType<typeof requestAnimationFrame>;
+    progressAnim.setValue(0);
+    setProgress(0);
 
-    const step = () => {
-      const elapsed = Date.now() - start;
-      const p = Math.min(1, elapsed / dur);
-      setProgress(p);
+    const slowAnimation = Animated.timing(progressAnim, {
+      toValue: 0.85,
+      duration: 10000, // 10 seconds slow drift
+      useNativeDriver: false,
+    });
+    slowAnimation.start();
 
+    const listenerId = progressAnim.addListener(({ value }) => {
+      setProgress(value);
+    });
+
+    return () => {
+      slowAnimation.stop();
+      progressAnim.removeListener(listenerId);
+    };
+  }, [agentIdx]);
+
+  // Monitor when the current agent completes in the SSE stream
+  useEffect(() => {
+    const currentAgentKey = AGENTS[agentIdx].key;
+    const isCompleted = results.some((r) =>
+      r.agent.toLowerCase().includes(currentAgentKey)
+    );
+
+    if (isCompleted) {
+      // Animate to 100% quickly on completion
       Animated.timing(progressAnim, {
-        toValue: p,
-        duration: 50,
+        toValue: 1,
+        duration: 400,
         useNativeDriver: false,
-      }).start();
-
-      if (p < 1) {
-        rafId = requestAnimationFrame(step);
-      } else {
+      }).start(() => {
         setTimeout(() => {
           if (agentIdx < AGENTS.length - 1) {
             setAgentIdx((prev) => prev + 1);
           } else {
             handleDone();
           }
-        }, 350);
-      }
-    };
+        }, 300);
+      });
+    }
+  }, [results, agentIdx]);
 
-    rafId = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(rafId);
-  }, [agentIdx]);
 
   const agent = AGENTS[agentIdx];
   const Scene = SCENES[agent.key];

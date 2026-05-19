@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { View, Image, StyleSheet, Animated, SafeAreaView } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
+import { DueDiligenceProvider } from '../context/DueDiligenceContext';
+
 
 // Prevent the splash screen from auto-hiding before our custom animation is ready
 SplashScreen.preventAutoHideAsync();
@@ -49,15 +51,17 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={DarkTheme}>
-      <View style={styles.container}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#09090F' } }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="search" />
-          <Stack.Screen name="loading" />
-          <Stack.Screen name="handoff" />
-          <Stack.Screen name="report" />
-        </Stack>
-        <StatusBar style="light" />
+      <DueDiligenceProvider>
+        <View style={styles.container}>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#09090F' } }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="search" />
+            <Stack.Screen name="loading" />
+            <Stack.Screen name="handoff" />
+            <Stack.Screen name="report" />
+          </Stack>
+          <StatusBar style="light" />
+
         
         {showCustomSplash && (
           <Animated.View style={[styles.splashContainer, { opacity }]}>
@@ -71,6 +75,7 @@ export default function RootLayout() {
           </Animated.View>
         )}
       </View>
+      </DueDiligenceProvider>
     </ThemeProvider>
   );
 }
