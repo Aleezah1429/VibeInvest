@@ -100,3 +100,47 @@ export async function pollAnalysis(
     await new Promise((r) => setTimeout(r, interval));
   }
 }
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  created_at: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  user: AuthUser;
+}
+
+export function apiSignUp(name: string, email: string, password: string): Promise<TokenResponse> {
+  return http<TokenResponse>('/api/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, password }),
+  });
+}
+
+export function apiSignIn(email: string, password: string): Promise<TokenResponse> {
+  return http<TokenResponse>('/api/auth/signin', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function apiGoogleAuth(
+  idToken: string,
+  name?: string,
+  email?: string,
+  googleId?: string
+): Promise<TokenResponse> {
+  return http<TokenResponse>('/api/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({
+      id_token: idToken,
+      name,
+      email,
+      google_id: googleId,
+    }),
+  });
+}

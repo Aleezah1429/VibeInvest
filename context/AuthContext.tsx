@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import * as Haptics from 'expo-haptics';
+import { apiSignIn, apiSignUp, apiGoogleAuth } from '../services/api';
 
 export interface User {
   name: string;
@@ -23,11 +24,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Mock registered users in-memory for testing
-  const [registeredUsers, setRegisteredUsers] = useState<Record<string, { name: string; password: string }>>({
-    'investor@vibeinvest.com': { name: 'Ali Rizvi', password: 'password123' },
-  });
-
   const triggerHaptic = async (type: 'success' | 'warning' | 'error' | 'light') => {
     try {
       if (type === 'success') {
@@ -44,29 +40,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const getErrorMessage = (err: any): string => {
+    const rawMessage = err?.message || '';
+    try {
+      const jsonStart = rawMessage.indexOf('{');
+      if (jsonStart !== -1) {
+        const jsonStr = rawMessage.substring(jsonStart);
+        const parsed = JSON.parse(jsonStr);
+        if (parsed && parsed.detail) {
+          return parsed.detail;
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors and fall back
+    }
+    
+    // Clean up generic HTTP wrapper
+    if (rawMessage.includes('HTTP 401') || rawMessage.includes('Incorrect password')) {
+      return 'Incorrect password. Please check your credentials.';
+    }
+    if (rawMessage.includes('HTTP 404') || rawMessage.includes('No account found')) {
+      return 'No account found with this email. Please sign up.';
+    }
+    if (rawMessage.includes('Failed to fetch') || rawMessage.includes('Network request failed')) {
+      return 'Cannot connect to backend server. Make sure the FastAPI app is running.';
+    }
+    return rawMessage.split(':').pop()?.trim() || rawMessage;
+  };
+
   const signIn = async (email: string, password: string) => {
     setIsLoading(true);
     await triggerHaptic('light');
     
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
-    const normalizedEmail = email.toLowerCase().trim();
-    const existingUser = registeredUsers[normalizedEmail];
-
-    if (existingUser && existingUser.password === password) {
+    try {
+      const res = await apiSignIn(email, password);
       setIsAuthenticated(true);
-      setUser({ name: existingUser.name, email: normalizedEmail });
+      setUser({ name: res.user.name, email: res.user.email });
       setIsLoading(false);
       await triggerHaptic('success');
-    } else {
+    } catch (err: any) {
       setIsLoading(false);
       await triggerHaptic('error');
-      if (existingUser) {
-        throw new Error('Incorrect password. Please try again.');
-      } else {
-        throw new Error('No account found with this email. Please sign up.');
-      }
+      throw new Error(getErrorMessage(err));
     }
   };
 
@@ -74,40 +89,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     await triggerHaptic('light');
 
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    const normalizedEmail = email.toLowerCase().trim();
-    
-    if (registeredUsers[normalizedEmail]) {
+    try {
+      const res = await apiSignUp(name, email, password);
+      setIsAuthenticated(true);
+      setUser({ name: res.user.name, email: res.user.email });
       setIsLoading(false);
-      await triggerHaptic('warning');
-      throw new Error('An account with this email already exists.');
+      await triggerHaptic('success');
+    } catch (err: any) {
+      setIsLoading(false);
+      await triggerHaptic('error');
+      throw new Error(getErrorMessage(err));
     }
-
-    // Register user in memory
-    setRegisteredUsers((prev) => ({
-      ...prev,
-      [normalizedEmail]: { name: name.trim(), password },
-    }));
-
-    setIsAuthenticated(true);
-    setUser({ name: name.trim(), email: normalizedEmail });
-    setIsLoading(false);
-    await triggerHaptic('success');
   };
 
   const signInWithGoogle = async () => {
     setIsLoading(true);
     await triggerHaptic('light');
 
-    // Simulate OAuth Web Browser redirection flow
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    setIsAuthenticated(true);
-    setUser({ name: 'Google Investor', email: 'google.investor@gmail.com' });
-    setIsLoading(false);
-    await triggerHaptic('success');
+    try {
+      // Simulate launching Google sign-in and getting profile token
+      const mockIdToken = `mock-google-token-${Date.now()}`;
+      const res = await apiGoogleAuth(
+        mockIdToken,
+        'Google Investor',
+        'google.investor@gmail.com',
+        'mock-google-id-123456'
+      );
+      
+      setIsAuthenticated(true);
+      setUser({ name: res.user.name, email: res.user.email });
+      setIsLoading(false);
+      await triggerHaptic('success');
+    } catch (err: any) {
+      setIsLoading(false);
+      await triggerHaptic('error');
+      throw new Error(getErrorMessage(err));
+    }
   };
 
   const signOut = async () => {
