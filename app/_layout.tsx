@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   splashImage: {
-    width: '100%',
-    height: '100%',
+    width: '50%',
+    height: '50%',
   },
 });
