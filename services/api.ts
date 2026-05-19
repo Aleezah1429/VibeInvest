@@ -1,0 +1,72 @@
+import { Platform } from 'react-native';
+import type {
+  AnalysisDetail,
+  AnalysisSummary,
+  StartupQuery,
+} from './types';
+
+function defaultBaseUrl(): string {
+  // Android emulator can't reach the host's localhost — it's 10.0.2.2 instead.
+  if (Platform.OS === 'android') return 'http://10.0.2.2:8000';
+  return 'http://127.0.0.1:8000';
+}
+
+export const API_BASE_URL =
+  (process.env.EXPO_PUBLIC_API_BASE_URL as string | undefined) || defaultBaseUrl();
+
+async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+  if (!res.ok) {
+    let detail = '';
+    try {
+      detail = await res.text();
+    } catch {
+      // ignore
+    }
+    throw new Error(`HTTP ${res.status} ${res.statusText}: ${detail}`);
+  }
+  return (await res.json()) as T;
+}
+
+export function createAnalysis(query: StartupQuery): Promise<AnalysisDetail> {
+  return http<AnalysisDetail>('/api/analyses', {
+    method: 'POST',
+    body: JSON.stringify(query),
+  });
+}
+
+export function getAnalysis(id: string): Promise<AnalysisDetail> {
+  return http<AnalysisDetail>(`/api/analyses/${id}`);
+}
+
+export function listAnalyses(limit = 10): Promise<AnalysisSummary[]> {
+  return http<AnalysisSummary[]>(`/api/analyses?limit=${limit}`);
+}
+
+export interface PollOptions {
+  intervalMs?: number;
+  timeoutMs?: number;
+  onUpdate?: (a: AnalysisDetail) => void;
+  signal?: AbortSignal;
+}
+
+/** Polls until status is completed/failed, or timeout fires. */
+export async function pollAnalysis(
+  id: string,
+  opts: PollOptions = {},
+): Promise<AnalysisDetail> {
+  const interval = opts.intervalMs ?? 2000;
+  const timeout = opts.timeoutMs ?? 240_000;
+  const start = Date.now();
+  while (true) {
+    if (opts.signal?.aborted) throw new Error('aborted');
+    const a = await getAnalysis(id);
+    opts.onUpdate?.(a);
+    if (a.status === 'completed' || a.status === 'failed') return a;
+    if (Date.now() - start > timeout) throw new Error('analysis timed out');
+    await new Promise((r) => setTimeout(r, interval));
+  }
+}

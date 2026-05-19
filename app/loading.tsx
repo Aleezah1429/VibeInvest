@@ -11,6 +11,12 @@ import {
   View
 } from 'react-native';
 import { Fonts } from '../constants/theme';
+import { getAnalysis } from '../services/api';
+import type { AnalysisDetail } from '../services/types';
+
+const POLL_INTERVAL_MS = 1500;
+const FAKE_TICK_MS = 3200;
+const AGENT_KEYS = ['skeptic', 'munshi', 'hype', 'cvo'] as const;
 
 // ── Agent Data ──────────────────────────────────────────────
 const AGENTS = [
@@ -417,53 +423,99 @@ const SCENES: Record<string, React.FC> = {
 // ── Main Screen ─────────────────────────────────────────────
 export default function LoadingScreen() {
   const router = useRouter();
-  const { name } = useLocalSearchParams<{ name: string }>();
+  const { name, id } = useLocalSearchParams<{ name: string; id?: string }>();
   const startupName = name || 'Bykea';
 
   const [agentIdx, setAgentIdx] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [hasRealRun, setHasRealRun] = useState<boolean>(!!id);
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   const handleDone = useCallback(() => {
-    router.replace({ pathname: '/handoff', params: { name: startupName } });
-  }, [router, startupName]);
+    router.replace({ pathname: '/handoff', params: { name: startupName, ...(id ? { id } : {}) } });
+  }, [router, startupName, id]);
 
   const handleSkip = useCallback(() => {
-    router.replace({ pathname: '/report', params: { name: startupName } });
-  }, [router, startupName]);
+    router.replace({ pathname: '/report', params: { name: startupName, ...(id ? { id } : {}) } });
+  }, [router, startupName, id]);
 
+  // Pulse the per-agent progress bar so the UI feels alive even when
+  // the backend hasn't ticked yet. This drives only the visual fill —
+  // agentIdx itself is driven by either the poller or the fake timer.
   useEffect(() => {
-    const dur = 3200;
+    setProgress(0);
+    progressAnim.setValue(0);
+    const dur = hasRealRun ? 6000 : FAKE_TICK_MS;
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: dur,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
     const start = Date.now();
-    let rafId: ReturnType<typeof requestAnimationFrame>;
+    const id2 = setInterval(() => {
+      setProgress(Math.min(1, (Date.now() - start) / dur));
+    }, 80);
+    return () => clearInterval(id2);
+  }, [agentIdx, hasRealRun]);
 
-    const step = () => {
-      const elapsed = Date.now() - start;
-      const p = Math.min(1, elapsed / dur);
-      setProgress(p);
-
-      Animated.timing(progressAnim, {
-        toValue: p,
-        duration: 50,
-        useNativeDriver: false,
-      }).start();
-
-      if (p < 1) {
-        rafId = requestAnimationFrame(step);
+  // No id → original timer-driven demo (e.g. opened directly).
+  useEffect(() => {
+    if (id) return;
+    const t = setTimeout(() => {
+      if (agentIdx < AGENTS.length - 1) {
+        setAgentIdx((p) => p + 1);
       } else {
-        setTimeout(() => {
-          if (agentIdx < AGENTS.length - 1) {
-            setAgentIdx((prev) => prev + 1);
-          } else {
-            handleDone();
-          }
-        }, 350);
+        handleDone();
       }
+    }, FAKE_TICK_MS + 350);
+    return () => clearTimeout(t);
+  }, [agentIdx, id, handleDone]);
+
+  // Real run → poll the backend; drive scene from agent_runs progress.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+    const tick = async () => {
+      try {
+        const a: AnalysisDetail = await getAnalysis(id);
+        if (cancelled) return;
+        setHasRealRun(true);
+
+        // Pick the visible agent: latest 'running' run, or last 'done' run.
+        const runs = a.progress || [];
+        const runningIdx = runs.findIndex((r) => r.status === 'running');
+        const lastDone = runs
+          .filter((r) => r.status === 'done')
+          .reduce((m, r) => Math.max(m, r.agent_id), 0);
+        const nextIdx =
+          runningIdx >= 0
+            ? Math.max(0, runs[runningIdx].agent_id - 1)
+            : Math.min(AGENTS.length - 1, Math.max(0, lastDone));
+        if (nextIdx !== agentIdx) setAgentIdx(nextIdx);
+
+        if (a.status === 'completed') {
+          handleDone();
+          return;
+        }
+        if (a.status === 'failed') {
+          handleSkip();
+          return;
+        }
+      } catch {
+        // Backend hiccup — keep polling.
+      }
+      if (!cancelled) timeoutHandle = setTimeout(tick, POLL_INTERVAL_MS);
     };
 
-    rafId = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(rafId);
-  }, [agentIdx]);
+    tick();
+    return () => {
+      cancelled = true;
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    };
+  }, [id, agentIdx, handleDone, handleSkip]);
 
   const agent = AGENTS[agentIdx];
   const Scene = SCENES[agent.key];

@@ -1,45 +1,97 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Animated, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { FileText, FileQuestion, FileEdit, Bike, Search, CircleDollarSign, Sparkles } from 'lucide-react-native';
+import { FileText, FileQuestion, FileEdit, Bike, Search, CircleDollarSign, Sparkles, Crown } from 'lucide-react-native';
+import { getAnalysis } from '../services/api';
+import type { AgentReport, ReportData, Verdict } from '../services/types';
+import { findingColor } from '../services/types';
+
+const PLACEHOLDER_REPORT: ReportData = {
+  startup_name: 'Bykea',
+  intent: 'invest',
+  tags: ['Mobility', 'Series A', 'Karachi', 'B2C'],
+  score: 712,
+  verdict: 'INVEST',
+  verdict_sub: 'WITH CONDITIONS',
+  dimensions: [
+    { name: 'Market fit', score: 78 },
+    { name: 'Financials', score: 63 },
+    { name: 'Brand power', score: 81 },
+    { name: 'Strategy', score: 70 },
+  ],
+  metrics: [
+    { label: 'Est. valuation', value: '$28M', change: '+12% YoY', change_type: 'positive' },
+    { label: 'Monthly GMV', value: '₨ 2.4B', change: 'Growing', change_type: 'positive' },
+    { label: 'Burn rate / mo', value: '$180K', change: 'High risk', change_type: 'negative' },
+    { label: 'Runway est.', value: '14 mo', change: 'Watch', change_type: 'warning' },
+  ],
+  agent_reports: [],
+};
+
+const DIM_COLORS = ['#6366f1', '#22c55e', '#a855f7', '#f59e0b'];
+const DIM_ICONS = ['map', 'cash', 'speedometer', 'extension-puzzle'] as const;
+
+const VERDICT_STYLE: Record<Verdict, { color: string; bg: string }> = {
+  INVEST: { color: '#22c55e', bg: 'rgba(34,197,94,0.05)' },
+  WATCH: { color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
+  PASS: { color: '#ef4444', bg: 'rgba(239,68,68,0.06)' },
+  ACQUIRE: { color: '#818cf8', bg: 'rgba(129,140,248,0.08)' },
+};
+
+const AGENT_ICONS: Record<number, { icon: any; color: string; bg: string; border: string }> = {
+  1: { icon: Search, color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)' },
+  2: { icon: CircleDollarSign, color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)' },
+  3: { icon: Sparkles, color: '#a855f7', bg: 'rgba(168,85,247,0.1)', border: 'rgba(168,85,247,0.2)' },
+  4: { icon: Crown, color: '#fbbf24', bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.25)' },
+};
 
 const DELIVERABLES = [
   {
     key: 'brief', icon: FileText, title: 'Investor Brief',
     sub: '2-page PDF · tl;dr + appendix', color: '#6366f1',
-    bullets: [
-      'Aura Score: 712 / 1000',
-      'Verdict: INVEST',
-      'Stage: Series A',
-      'Suggested check size: $250k–$500k',
-    ],
   },
   {
     key: 'questions', icon: FileQuestion, title: 'Questions to Ask',
     sub: '12 sharp questions for the founder', color: '#a855f7',
-    bullets: [
-      'How do you plan to push margins above 10%?',
-      'When do tier-2 cities turn unit-econ positive?',
-      'What\'s your dollar-denominated raise hedge?',
-    ],
   },
   {
     key: 'memo', icon: FileEdit, title: 'Deal Memo Draft',
     sub: 'Editable doc · 800 words', color: '#f59e0b',
-    bullets: [
-      'Thesis · why now',
-      'Market · B2C Mobility',
-      'Risks · FX mismatch, logistics',
-      'Recommendation · INVEST · with conditions',
-    ],
   },
 ];
 
+function buildBullets(report: ReportData, key: string): string[] {
+  if (key === 'brief') {
+    return [
+      `Aura Score: ${report.score} / 1000`,
+      `Verdict: ${report.verdict}${report.verdict_sub ? ` · ${report.verdict_sub}` : ''}`,
+      report.tags[0] ? `Sector: ${report.tags[0]}` : 'Sector: —',
+      `Dimensions: ${report.dimensions.map((d) => `${d.name} ${d.score}`).join(' · ')}`,
+    ];
+  }
+  if (key === 'questions') {
+    const negatives = report.agent_reports
+      .flatMap((r) => r.findings)
+      .filter((f) => f.type === 'negative' || f.type === 'warning')
+      .slice(0, 4)
+      .map((f) => f.text);
+    return negatives.length ? negatives : ['Margin path?', 'Unit econ at scale?', 'Cash runway?'];
+  }
+  return [
+    `Thesis · ${report.verdict.toLowerCase()} · ${report.startup_name}`,
+    `Market · ${report.tags[0] || 'unknown'}`,
+    `Risks · ${report.agent_reports.flatMap((r) => r.findings).filter((f) => f.type !== 'positive').slice(0, 2).map((f) => f.text.slice(0, 40)).join('; ') || 'see findings'}`,
+    `Recommendation · ${report.verdict}${report.verdict_sub ? ` · ${report.verdict_sub}` : ''}`,
+  ];
+}
+
 export default function ReportScreen() {
   const router = useRouter();
-  const { name } = useLocalSearchParams<{ name: string }>();
-  const startupName = name || 'Bykea';
+  const { name, id } = useLocalSearchParams<{ name: string; id?: string }>();
+
+  const [report, setReport] = useState<ReportData | null>(id ? null : PLACEHOLDER_REPORT);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [expandedCard, setExpandedCard] = useState<number | null>(1);
   const [expandedDeliv, setExpandedDeliv] = useState<string | null>('brief');
@@ -48,20 +100,44 @@ export default function ReportScreen() {
   const stampAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animate score from 0 to 712
-    let start = 0;
-    const target = 712;
+    if (!id) return;
+    let cancelled = false;
+    getAnalysis(id)
+      .then((a) => {
+        if (cancelled) return;
+        if (a.report) setReport(a.report);
+        else if (a.status === 'failed') {
+          setLoadError(a.error || 'Analysis failed.');
+          setReport(PLACEHOLDER_REPORT);
+        } else {
+          setReport(PLACEHOLDER_REPORT);
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setLoadError(e?.message || 'Could not load report.');
+        setReport(PLACEHOLDER_REPORT);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const target = report?.score ?? 0;
+  const startupName = report?.startup_name || name || 'Bykea';
+
+  useEffect(() => {
+    if (!report) return;
     const duration = 1500;
     const startTime = Date.now();
-    
+    let rafId: number;
     const animateScore = () => {
       const now = Date.now();
       const progress = Math.min((now - startTime) / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
       setScore(Math.round(eased * target));
-      
       if (progress < 1) {
-        requestAnimationFrame(animateScore);
+        rafId = requestAnimationFrame(animateScore);
       } else {
         Animated.spring(stampAnim, {
           toValue: 1,
@@ -71,11 +147,25 @@ export default function ReportScreen() {
         }).start();
       }
     };
-    requestAnimationFrame(animateScore);
-  }, []);
+    rafId = requestAnimationFrame(animateScore);
+    return () => cancelAnimationFrame(rafId);
+  }, [report, target]);
 
   const toggleCard = (id: number) => setExpandedCard(expandedCard === id ? null : id);
   const toggleDeliv = (key: string) => setExpandedDeliv(expandedDeliv === key ? null : key);
+
+  if (!report) {
+    return (
+      <SafeAreaView style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator color="#818cf8" />
+        <Text style={{ color: 'rgba(255,255,255,0.4)', marginTop: 12, fontSize: 12 }}>
+          loading report…
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
+  const verdictStyle = VERDICT_STYLE[report.verdict] ?? VERDICT_STYLE.WATCH;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -106,6 +196,7 @@ export default function ReportScreen() {
           {/* Stamp Reveal */}
           <Animated.View style={[
             styles.stampContainer,
+            { borderColor: verdictStyle.color, backgroundColor: verdictStyle.bg },
             {
               opacity: stampAnim,
               transform: [
@@ -114,12 +205,22 @@ export default function ReportScreen() {
               ]
             }
           ]}>
-            <Text style={styles.stampText}>INVEST</Text>
+            <Text style={[styles.stampText, { color: verdictStyle.color }]}>{report.verdict}</Text>
           </Animated.View>
-          
-          <Animated.View style={[styles.stampSubTextContainer, { opacity: stampAnim }]}>
-             <Text style={styles.stampSubText}>WITH CONDITIONS</Text>
-          </Animated.View>
+
+          {report.verdict_sub ? (
+            <Animated.View style={[styles.stampSubTextContainer, { opacity: stampAnim }]}>
+              <Text style={[styles.stampSubText, { color: verdictStyle.color, opacity: 0.7 }]}>
+                {report.verdict_sub}
+              </Text>
+            </Animated.View>
+          ) : null}
+
+          {loadError ? (
+            <Text style={{ marginTop: 14, color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
+              showing placeholder · {loadError}
+            </Text>
+          ) : null}
         </View>
 
         {/* DETAILS OVERVIEW */}
@@ -130,54 +231,75 @@ export default function ReportScreen() {
           <View style={styles.startupMeta}>
             <Text style={styles.startupNameLg}>{startupName}</Text>
             <View style={styles.startupTags}>
-              <Text style={styles.tag}>Mobility</Text>
-              <Text style={styles.tag}>Series A</Text>
-              <Text style={styles.tag}>Karachi</Text>
-              <Text style={styles.tag}>B2C</Text>
+              {(report.tags.length ? report.tags : ['—']).slice(0, 5).map((t, i) => (
+                <Text key={`${t}-${i}`} style={styles.tag}>{t}</Text>
+              ))}
             </View>
           </View>
         </View>
 
         <Text style={styles.rSectionLbl}>DIMENSION SCORES</Text>
         <View style={styles.dimGrid}>
-          <DimItem icon="map" name="Market fit" score={78} color="#6366f1" />
-          <DimItem icon="cash" name="Financials" score={63} color="#22c55e" />
-          <DimItem icon="speedometer" name="Brand power" score={81} color="#a855f7" />
-          <DimItem icon="extension-puzzle" name="Strategy" score={70} color="#f59e0b" />
+          {report.dimensions.map((d, i) => (
+            <DimItem
+              key={d.name}
+              icon={DIM_ICONS[i] ?? 'analytics'}
+              name={d.name}
+              score={d.score}
+              color={DIM_COLORS[i % DIM_COLORS.length]}
+            />
+          ))}
         </View>
 
         <Text style={styles.rSectionLbl}>KEY METRICS</Text>
         <View style={styles.keyMetrics}>
-          <MetricCard label="Est. valuation" value="$28M" change="+12% YoY" changeColor="#22c55e" />
-          <MetricCard label="Monthly GMV" value="₨ 2.4B" change="Growing" changeColor="#22c55e" />
-          <MetricCard label="Burn rate / mo" value="$180K" change="High risk" changeColor="#ef4444" />
-          <MetricCard label="Runway est." value="14 mo" change="Watch" changeColor="#f59e0b" />
+          {report.metrics.length === 0 ? (
+            <Text style={{ paddingHorizontal: 20, color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>
+              No metrics surfaced.
+            </Text>
+          ) : (
+            report.metrics.map((m, i) => (
+              <MetricCard
+                key={`${m.label}-${i}`}
+                label={m.label}
+                value={m.value}
+                change={m.change}
+                changeColor={findingColor(m.change_type)}
+              />
+            ))
+          )}
         </View>
 
         <Text style={styles.rSectionLbl}>AGENT REPORTS</Text>
         <View style={styles.agentReports}>
-          <AgentCard
-            id={1} icon={<Search color="#ef4444" size={18} />} iconBg="rgba(239,68,68,0.1)" iconBorder="rgba(239,68,68,0.2)"
-            name="The Skeptic" role="Market & competition"
-            badge="3 flags" badgeColor="#ef4444" badgeBg="rgba(239,68,68,0.12)" badgeBorder="rgba(239,68,68,0.25)"
-            body="Bykea operates in a market with significant structural risk — two-wheel mobility faces regulatory uncertainty."
-            findings={[
-              { text: "InDrive entered PK market Q3 2023", color: "#ef4444" },
-              { text: "Lahore expansion stalled since 2022", color: "#f59e0b" }
-            ]}
-            expanded={expandedCard === 1} onToggle={() => toggleCard(1)}
-          />
-          <AgentCard
-            id={2} icon={<CircleDollarSign color="#22c55e" size={18} />} iconBg="rgba(34,197,94,0.08)" iconBorder="rgba(34,197,94,0.2)"
-            name="The Munshi" role="Financial analysis"
-            badge="Borderline" badgeColor="#fbbf24" badgeBg="rgba(251,191,36,0.12)" badgeBorder="rgba(251,191,36,0.25)"
-            body="Unit economics are solid but PKR devaluation has impacted USD-denominated burn."
-            findings={[
-              { text: "LTV:CAC of 5.8x — above minimum threshold", color: "#22c55e" },
-              { text: "FX mismatch: costs in USD, revenue in PKR", color: "#ef4444" }
-            ]}
-            expanded={expandedCard === 2} onToggle={() => toggleCard(2)}
-          />
+          {(report.agent_reports.length ? report.agent_reports : []).map((r: AgentReport) => {
+            const meta = AGENT_ICONS[r.id] ?? AGENT_ICONS[1];
+            const Icon = meta.icon;
+            return (
+              <AgentCard
+                key={r.id}
+                id={r.id}
+                icon={<Icon color={meta.color} size={18} />}
+                iconBg={meta.bg}
+                iconBorder={meta.border}
+                name={r.name}
+                role={r.role}
+                badge={r.badge || '—'}
+                badgeColor={meta.color}
+                badgeBg={meta.bg}
+                badgeBorder={meta.border}
+                body={r.body}
+                findings={r.findings.map((f) => ({ text: f.text, color: findingColor(f.type) }))}
+                expanded={expandedCard === r.id}
+                onToggle={() => toggleCard(r.id)}
+              />
+            );
+          })}
+          {report.agent_reports.length === 0 ? (
+            <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>
+              No agent reports yet.
+            </Text>
+          ) : null}
         </View>
 
         {/* DELIVERABLES SECTION */}
@@ -192,10 +314,11 @@ export default function ReportScreen() {
         <View style={styles.deliverablesList}>
           {DELIVERABLES.map((d) => {
             const isOpen = expandedDeliv === d.key;
+            const bullets = buildBullets(report, d.key);
             return (
               <View key={d.key} style={styles.delivItem}>
-                <TouchableOpacity 
-                  style={[styles.delivHeader, isOpen && styles.delivHeaderOpen, { borderLeftColor: d.color }]} 
+                <TouchableOpacity
+                  style={[styles.delivHeader, isOpen && styles.delivHeaderOpen, { borderLeftColor: d.color }]}
                   onPress={() => toggleDeliv(d.key)}
                   activeOpacity={0.8}
                 >
@@ -208,10 +331,10 @@ export default function ReportScreen() {
                   </View>
                   <Ionicons name={isOpen ? "remove" : "add"} size={20} color="rgba(255,255,255,0.4)" />
                 </TouchableOpacity>
-                
+
                 {isOpen && (
                   <View style={[styles.delivBody, { borderLeftColor: d.color }]}>
-                    {d.bullets.map((b, i) => (
+                    {bullets.map((b, i) => (
                       <View key={i} style={styles.delivBullet}>
                         <Text style={styles.delivNum}>{(i + 1).toString().padStart(2, '0')}</Text>
                         <Text style={styles.delivBulletText}>{b}</Text>

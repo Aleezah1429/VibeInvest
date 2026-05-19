@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertTriangle, ArrowRight, CircleDollarSign, Crown, Search, Sparkles } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   SafeAreaView,
@@ -11,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import { Fonts } from '../constants/theme';
+import { getAnalysis } from '../services/api';
+import type { AgentReport, AnalysisDetail, Finding } from '../services/types';
 
 // ── Agent Data ──────────────────────────────────────────────
 const AGENTS: Record<string, { icon: any; name: string; role: string; color: string }> = {
@@ -47,6 +49,53 @@ const CHAT_SCRIPT: ChatMessage[] = [
   { agent: 'cvo', text: 'weighting risk × upside × vibe…' },
   { agent: 'cvo', text: 'verdict locked. tap to reveal the aura score.', final: true },
 ];
+
+const AGENT_KEY_BY_ID: Record<number, keyof typeof AGENTS> = {
+  1: 'skeptic',
+  2: 'munshi',
+  3: 'hype',
+  4: 'cvo',
+};
+
+const HANDOFF_LABELS: Record<number, string> = {
+  1: 'skeptic → munshi',
+  2: 'munshi → hype',
+  3: '3 reports → CVO',
+};
+
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.?!])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function findingsToText(findings: Finding[]): { text: string; flag?: boolean }[] {
+  return findings.slice(0, 2).map((f) => ({
+    text: f.text,
+    flag: f.type === 'negative' || f.type === 'warning',
+  }));
+}
+
+function buildScriptFromReports(reports: AgentReport[]): ChatMessage[] {
+  const ordered = [...reports].sort((a, b) => a.id - b.id);
+  const out: ChatMessage[] = [];
+  ordered.forEach((r, i) => {
+    const key = AGENT_KEY_BY_ID[r.id];
+    if (!key) return;
+    const sentences = splitSentences(r.body).slice(0, 2);
+    sentences.forEach((s) => out.push({ agent: key, text: s }));
+    findingsToText(r.findings).forEach((f) =>
+      out.push({ agent: key, text: f.text, flag: f.flag })
+    );
+    if (i < ordered.length - 1) {
+      out.push({ handoff: HANDOFF_LABELS[r.id] || `${key} →` });
+    } else if (r.id === 4) {
+      out[out.length - 1] = { ...out[out.length - 1], final: true };
+    }
+  });
+  return out;
+}
 
 // ── Chat Bubble ─────────────────────────────────────────────
 function ChatBubble({ message }: { message: ChatMessage }) {
@@ -133,18 +182,43 @@ function ChatBubble({ message }: { message: ChatMessage }) {
 // ── Main Handoff Screen ─────────────────────────────────────
 export default function HandoffScreen() {
   const router = useRouter();
-  const { name } = useLocalSearchParams<{ name: string }>();
+  const { name, id } = useLocalSearchParams<{ name: string; id?: string }>();
   const startupName = name || 'Bykea';
 
   const [step, setStep] = useState(0);
+  const [analysis, setAnalysis] = useState<AnalysisDetail | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    if (step >= CHAT_SCRIPT.length) return;
+    if (!id) return;
+    let cancelled = false;
+    getAnalysis(id)
+      .then((a) => {
+        if (!cancelled) setAnalysis(a);
+      })
+      .catch(() => {
+        // fall through to the hardcoded script
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const script = useMemo<ChatMessage[]>(() => {
+    const reports = analysis?.report?.agent_reports;
+    if (reports && reports.length > 0) {
+      const built = buildScriptFromReports(reports);
+      if (built.length > 0) return built;
+    }
+    return CHAT_SCRIPT;
+  }, [analysis]);
+
+  useEffect(() => {
+    if (step >= script.length) return;
     const delay = step === 0 ? 400 : 950;
     const t = setTimeout(() => setStep((s) => s + 1), delay);
     return () => clearTimeout(t);
-  }, [step]);
+  }, [step, script.length]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -152,15 +226,15 @@ export default function HandoffScreen() {
     }, 100);
   }, [step]);
 
-  const messages = CHAT_SCRIPT.slice(0, step);
-  const isDone = step >= CHAT_SCRIPT.length;
+  const messages = script.slice(0, step);
+  const isDone = step >= script.length;
 
   const handleReveal = () => {
-    router.replace({ pathname: '/report', params: { name: startupName } });
+    router.replace({ pathname: '/report', params: { name: startupName, ...(id ? { id } : {}) } });
   };
 
   const handleSkip = () => {
-    router.replace({ pathname: '/report', params: { name: startupName } });
+    router.replace({ pathname: '/report', params: { name: startupName, ...(id ? { id } : {}) } });
   };
 
   return (
