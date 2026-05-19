@@ -31,12 +31,42 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function createAnalysis(query: StartupQuery): Promise<AnalysisDetail> {
-  return http<AnalysisDetail>('/api/analyses', {
+export function createAnalysis(
+  query: StartupQuery & { file?: { uri: string; name: string; type: string } | null }
+): Promise<AnalysisDetail> {
+  const formData = new FormData();
+  formData.append('name', query.name);
+  if (query.intent) formData.append('intent', query.intent);
+  if (query.sector) formData.append('sector', query.sector);
+  if (query.stage) formData.append('stage', query.stage);
+  if (query.funding) formData.append('funding', query.funding);
+  if (query.context) formData.append('context', query.context);
+
+  if (query.file) {
+    formData.append('file', {
+      uri: query.file.uri,
+      name: query.file.name,
+      type: query.file.type || 'application/pdf',
+    } as any);
+  }
+
+  return fetch(`${API_BASE_URL}/api/analyses`, {
     method: 'POST',
-    body: JSON.stringify(query),
+    body: formData,
+  }).then(async (res) => {
+    if (!res.ok) {
+      let detail = '';
+      try {
+        detail = await res.text();
+      } catch {
+        // ignore
+      }
+      throw new Error(`HTTP ${res.status} ${res.statusText}: ${detail}`);
+    }
+    return res.json() as Promise<AnalysisDetail>;
   });
 }
+
 
 export function getAnalysis(id: string): Promise<AnalysisDetail> {
   return http<AnalysisDetail>(`/api/analyses/${id}`);

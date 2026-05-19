@@ -1,9 +1,12 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Animated, ActivityIndicator, Alert, Linking, Share, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+
 import { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { FileText, FileQuestion, FileEdit, Bike, Search, CircleDollarSign, Sparkles, Crown } from 'lucide-react-native';
-import { getAnalysis } from '../services/api';
+import { getAnalysis, API_BASE_URL } from '../services/api';
+
 import type { AgentReport, ReportData, Verdict } from '../services/types';
 import { findingColor } from '../services/types';
 
@@ -154,6 +157,51 @@ export default function ReportScreen() {
   const toggleCard = (id: number) => setExpandedCard(expandedCard === id ? null : id);
   const toggleDeliv = (key: string) => setExpandedDeliv(expandedDeliv === key ? null : key);
 
+  const handleDownloadPdf = async () => {
+    if (!id) {
+      Alert.alert('Error', 'Cannot download report: No analysis ID available.');
+      return;
+    }
+    const pdfUrl = `${API_BASE_URL}/api/analyses/${id}/pdf`;
+    try {
+      await WebBrowser.openBrowserAsync(pdfUrl);
+    } catch (error) {
+      Linking.openURL(pdfUrl).catch(() => {
+        Alert.alert('Download Failed', 'Could not open the PDF report link.');
+      });
+    }
+  };
+
+  const handleShare = async () => {
+    if (!id) return;
+    const pdfUrl = `${API_BASE_URL}/api/analyses/${id}/pdf`;
+    
+    // Natively support clipboard copy on web/browsers since standard OS Share sheets fail there
+    if (Platform.OS === 'web') {
+      try {
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(pdfUrl);
+          Alert.alert('Link Copied', 'The PDF report link has been copied to your clipboard!');
+          return;
+        }
+      } catch (err) {
+        // fallback
+      }
+    }
+
+    try {
+      await Share.share({
+        message: `Check out VibeInvest due diligence report for ${startupName}: ${pdfUrl}`,
+        url: pdfUrl,
+        title: `${startupName} Due Diligence Report`,
+      });
+    } catch (e) {
+      Alert.alert('Share Failed', 'Could not share the due diligence report.');
+    }
+  };
+
+
+
   if (!report) {
     return (
       <SafeAreaView style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
@@ -175,9 +223,25 @@ export default function ReportScreen() {
           <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Back</Text>
         </TouchableOpacity>
         <View style={styles.reportActions}>
-          <TouchableOpacity style={styles.iconBtn}><Ionicons name="download-outline" size={16} color="rgba(255,255,255,0.6)" /></TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}><Ionicons name="share-outline" size={16} color="rgba(255,255,255,0.6)" /></TouchableOpacity>
+          <TouchableOpacity
+            style={styles.downloadPill}
+            onPress={handleDownloadPdf}
+            accessibilityLabel="Download report PDF"
+          >
+            <Ionicons name="download-outline" size={14} color="#fff" style={{ marginRight: 5 }} />
+            <Text style={styles.pillText}>PDF</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sharePill}
+            onPress={handleShare}
+            accessibilityLabel="Share report"
+          >
+            <Ionicons name="share-outline" size={14} color="rgba(255,255,255,0.85)" style={{ marginRight: 5 }} />
+            <Text style={styles.pillTextSec}>Share</Text>
+          </TouchableOpacity>
         </View>
+
+
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
@@ -340,16 +404,7 @@ export default function ReportScreen() {
                         <Text style={styles.delivBulletText}>{b}</Text>
                       </View>
                     ))}
-                    <View style={styles.delivActions}>
-                      <TouchableOpacity style={styles.delivBtn}>
-                        <Ionicons name="download-outline" size={14} color="rgba(255,255,255,0.7)" />
-                        <Text style={styles.delivBtnText}>Download</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.delivBtn}>
-                        <Ionicons name="share-outline" size={14} color="rgba(255,255,255,0.7)" />
-                        <Text style={styles.delivBtnText}>Share</Text>
-                      </TouchableOpacity>
-                    </View>
+
                   </View>
                 )}
               </View>
@@ -420,7 +475,11 @@ const styles = StyleSheet.create({
   reportHeader: { paddingHorizontal: 20, paddingTop: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 },
   reportBack: { flexDirection: 'row', alignItems: 'center' },
   reportActions: { flexDirection: 'row', gap: 8 },
-  iconBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  downloadPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: '#6366f1', borderWidth: 0.5, borderColor: 'rgba(99,102,241,0.5)', minHeight: 36 },
+  sharePill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)', minHeight: 36 },
+  pillText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  pillTextSec: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
+
   
   // Score Section
   scoreSection: { alignItems: 'center', marginTop: 60, marginBottom: 20 },
