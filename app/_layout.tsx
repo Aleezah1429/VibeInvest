@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { View, Image, StyleSheet, Animated, SafeAreaView } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '../context/AuthContext';
+import { ReportsProvider } from '../context/ReportsContext';
 
 // Prevent the splash screen from auto-hiding before our custom animation is ready
 SplashScreen.preventAutoHideAsync();
@@ -50,6 +51,7 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
+      <ReportsProvider>
       <ThemeProvider value={DarkTheme}>
         <View style={styles.container}>
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#09090F' } }}>
@@ -59,6 +61,7 @@ export default function RootLayout() {
             <Stack.Screen name="loading" />
             <Stack.Screen name="handoff" />
             <Stack.Screen name="report" />
+            <Stack.Screen name="how-they-work" />
           </Stack>
           <StatusBar style="light" />
           
@@ -75,6 +78,7 @@ export default function RootLayout() {
           )}
         </View>
       </ThemeProvider>
+      </ReportsProvider>
     </AuthProvider>
   );
 }

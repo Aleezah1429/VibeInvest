@@ -1,75 +1,343 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  SafeAreaView,
+  Image,
   KeyboardAvoidingView,
-  ScrollView,
   Platform,
   ActivityIndicator,
-  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { useAuth } from '../context/AuthContext';
 
+// ── design tokens — mirrors VibeInvest/auth.jsx mock ────────────────────────
+const T = {
+  bg: '#08080d',
+  ink: '#ffffff',
+  dim: 'rgba(255,255,255,0.56)',
+  faint: 'rgba(255,255,255,0.36)',
+  ghost: 'rgba(255,255,255,0.22)',
+  line: 'rgba(255,255,255,0.07)',
+  line2: 'rgba(255,255,255,0.12)',
+  glass: 'rgba(255,255,255,0.035)',
+  glass2: 'rgba(255,255,255,0.05)',
+  fieldBg: 'rgba(0,0,0,0.35)',
+  purple: '#9550ee',
+  purpleSoft: 'rgba(149,80,238,0.18)',
+  purpleEdge: 'rgba(149,80,238,0.45)',
+  purpleInk: '#d6c0ff',
+  purpleDeep: '#7b3bd9',
+  green: '#3ddc97',
+  amber: '#f0b34a',
+  red: '#ff5d6c',
+};
+
+const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) as string;
+
+// ── Hero (logo + kicker + headline + tagline) ───────────────────────────────
+function Hero({ mode }: { mode: 'signin' | 'signup' }) {
+  return (
+    <View style={styles.hero}>
+      <Image
+        source={require('../assets/images/VI-logo.png')}
+        style={styles.logoImage}
+        resizeMode="contain"
+      />
+
+      <Text style={styles.heroHeadline}>
+        {mode === 'signin' ? 'Welcome back.' : 'Welcome Onboard'}
+      </Text>
+      <Text style={styles.heroTagline}>
+        {mode === 'signin'
+          ? 'Sign in to run Aura on any startup — public or private.'
+          : "Pakistan's premier AI due-diligence hub for VCs, angels and acquirers."}
+      </Text>
+    </View>
+  );
+}
+
+// ── Segmented mode switcher ─────────────────────────────────────────────────
+function Segmented({
+  mode,
+  setMode,
+  disabled,
+}: {
+  mode: 'signin' | 'signup';
+  setMode: (m: 'signin' | 'signup') => void;
+  disabled?: boolean;
+}) {
+  return (
+    <View style={styles.segmentedRow}>
+      {(['signin', 'signup'] as const).map((m) => {
+        const active = mode === m;
+        return (
+          <TouchableOpacity
+            key={m}
+            onPress={() => setMode(m)}
+            disabled={disabled}
+            accessibilityLabel={m === 'signin' ? 'Switch to Sign In' : 'Switch to Create Account'}
+            style={[styles.segment, active && styles.segmentActive]}
+          >
+            {active && <View style={styles.segmentNotch} />}
+            <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+              {m === 'signin' ? 'Sign In' : 'Create Account'}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+// ── Generic labelled input row ──────────────────────────────────────────────
+type FieldProps = {
+  label: string;
+  hint?: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  value: string;
+  onChangeText: (s: string) => void;
+  placeholder: string;
+  secure?: boolean;
+  keyboardType?: 'default' | 'email-address';
+  autoCapitalize?: 'none' | 'words' | 'sentences';
+  autoComplete?: 'email' | 'name' | 'password' | 'off';
+  editable?: boolean;
+  rightSlot?: React.ReactNode;
+};
+function Field({
+  label,
+  hint,
+  icon,
+  value,
+  onChangeText,
+  placeholder,
+  secure,
+  keyboardType = 'default',
+  autoCapitalize = 'sentences',
+  autoComplete,
+  editable = true,
+  rightSlot,
+}: FieldProps) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <View style={styles.fieldLabelRow}>
+        <Text style={styles.fieldLabel}>{label.toUpperCase()}</Text>
+        {hint && <Text style={styles.fieldHint}>{hint}</Text>}
+      </View>
+      <View style={[styles.fieldBox, focused && styles.fieldBoxFocused]}>
+        <Ionicons
+          name={icon}
+          size={16}
+          color={focused ? T.purpleInk : T.faint}
+          style={{ marginRight: 10 }}
+        />
+        <TextInput
+          style={styles.fieldInput}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={T.ghost}
+          secureTextEntry={!!secure}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoComplete={autoComplete}
+          editable={editable}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+        />
+        {rightSlot}
+      </View>
+    </View>
+  );
+}
+
+// ── Password strength meter ─────────────────────────────────────────────────
+function StrengthMeter({ value }: { value: string }) {
+  const score =
+    (value.length >= 8 ? 1 : 0) +
+    (/[A-Z]/.test(value) ? 1 : 0) +
+    (/[0-9]/.test(value) ? 1 : 0) +
+    (/[^A-Za-z0-9]/.test(value) ? 1 : 0);
+  const labels = ['—', 'Weak', 'OK', 'Strong', 'Excellent'] as const;
+  const colors = [T.line2, T.red, T.amber, T.purpleInk, T.green] as const;
+  const tone = colors[score];
+  return (
+    <View style={{ marginTop: -6, marginBottom: 14 }}>
+      <View style={{ flexDirection: 'row', gap: 3, marginBottom: 4 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <View
+            key={i}
+            style={{
+              flex: 1,
+              height: 2,
+              borderRadius: 2,
+              backgroundColor: i < score ? tone : T.line2,
+            }}
+          />
+        ))}
+      </View>
+      <View style={styles.strengthRow}>
+        <Text style={styles.strengthLabel}>
+          Strength: <Text style={{ color: tone }}>{labels[score]}</Text>
+        </Text>
+        <Text style={styles.strengthLabel}>8+ chars · 1 number · 1 symbol</Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Primary CTA with glow halo ──────────────────────────────────────────────
+function CTA({
+  label,
+  icon,
+  onPress,
+  loading,
+  disabled,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <View style={{ marginTop: 4, marginBottom: 18 }}>
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={disabled || loading}
+        accessibilityLabel={label}
+        activeOpacity={0.85}
+        style={[styles.ctaTouchable, (disabled || loading) && { opacity: 0.6 }]}
+      >
+        <LinearGradient
+          colors={['#9550ee', '#7b3bd9']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.cta}
+        >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <>
+            <Ionicons name={icon} size={16} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.ctaText}>{label}</Text>
+            <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />
+          </>
+        )}
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ── OR divider ──────────────────────────────────────────────────────────────
+function OrDivider() {
+  return (
+    <View style={styles.orRow}>
+      <View style={styles.orLine} />
+      <Text style={styles.orText}>OR</Text>
+      <View style={styles.orLine} />
+    </View>
+  );
+}
+
+// ── Google sign-in button ───────────────────────────────────────────────────
+function GoogleButton({
+  onPress,
+  disabled,
+  mode,
+}: {
+  onPress: () => void;
+  disabled?: boolean;
+  mode: 'signin' | 'signup';
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityLabel={mode === 'signin' ? 'Sign in with Google' : 'Sign up with Google'}
+      style={[styles.oauthBtn, disabled && { opacity: 0.6 }]}
+    >
+      <Ionicons name="logo-google" size={16} color="#ea4335" style={{ marginRight: 8 }} />
+      <Text style={styles.oauthText}>
+        {mode === 'signin' ? 'Continue with Google' : 'Sign up with Google'}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ── Switch mode footer link ─────────────────────────────────────────────────
+function FooterLink({
+  mode,
+  onSwitch,
+  disabled,
+}: {
+  mode: 'signin' | 'signup';
+  onSwitch: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <View style={styles.switchFooter}>
+      <Text style={styles.switchFooterText}>
+        {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+      </Text>
+      <TouchableOpacity onPress={onSwitch} disabled={disabled}>
+        <Text style={styles.switchFooterLink}>
+          {mode === 'signin' ? 'Create one.' : 'Sign in.'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ── Error banner ────────────────────────────────────────────────────────────
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <View style={styles.errorBox}>
+      <Ionicons name="alert-circle-outline" size={16} color={T.red} style={{ marginRight: 8 }} />
+      <Text style={styles.errorText}>{message}</Text>
+    </View>
+  );
+}
+
+// ── Main screen ─────────────────────────────────────────────────────────────
 export default function AuthScreen() {
   const router = useRouter();
   const { signIn, signUp, signInWithGoogle, isLoading } = useAuth();
 
-  // Mode: 'signin' | 'signup'
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-
-  // Input states
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
-  // UI state
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Field focus states (for custom glowing borders)
-  const [focusName, setFocusName] = useState(false);
-  const [focusEmail, setFocusEmail] = useState(false);
-  const [focusPassword, setFocusPassword] = useState(false);
+  const isValidEmail = (text: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
 
-  // Quick email format validator
-  const isValidEmail = (text: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
+  const clearErrorOnChange = <T,>(setter: (v: T) => void) => (v: T) => {
+    setter(v);
+    if (errorMessage) setErrorMessage(null);
   };
 
   const handleAuth = async () => {
     setErrorMessage(null);
-
-    // Validation
-    if (mode === 'signup' && !name.trim()) {
-      setErrorMessage('Full name is required.');
-      return;
-    }
-
-    if (!email.trim()) {
-      setErrorMessage('Email address is required.');
-      return;
-    }
-
-    if (!isValidEmail(email)) {
-      setErrorMessage('Please enter a valid email address.');
-      return;
-    }
-
-    if (!password) {
-      setErrorMessage('Password is required.');
-      return;
-    }
-
-    if (password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters.');
-      return;
-    }
+    if (mode === 'signup' && !name.trim()) return setErrorMessage('Full name is required.');
+    if (!email.trim()) return setErrorMessage('Email is required.');
+    if (!isValidEmail(email)) return setErrorMessage('Please enter a valid email.');
+    if (!password) return setErrorMessage('Password is required.');
+    if (password.length < 6) return setErrorMessage('Password must be at least 6 characters.');
+    if (mode === 'signup' && !confirmPassword) return setErrorMessage('Please confirm your password.');
+    if (mode === 'signup' && password !== confirmPassword) return setErrorMessage('Passwords do not match.');
 
     try {
       if (mode === 'signin') {
@@ -77,14 +345,13 @@ export default function AuthScreen() {
       } else {
         await signUp(name, email, password);
       }
-      // Navigate to main welcome page
       router.replace('/');
     } catch (err: any) {
       setErrorMessage(err?.message ?? 'An error occurred during authentication.');
     }
   };
 
-  const handleGoogleAuth = async () => {
+  const handleGoogle = async () => {
     setErrorMessage(null);
     try {
       await signInWithGoogle();
@@ -94,471 +361,370 @@ export default function AuthScreen() {
     }
   };
 
+  const passwordEye = (
+    <TouchableOpacity
+      onPress={() => setShowPassword((s) => !s)}
+      accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+      style={{ padding: 6 }}
+    >
+      <Ionicons
+        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+        size={18}
+        color={T.faint}
+      />
+    </TouchableOpacity>
+  );
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {/* Header branding */}
-          <View style={styles.brandContainer}>
-            <Image
-              source={require('../assets/images/VI-logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-            <Text style={styles.brandTitle}>
-              Vibe<Text style={styles.brandSpan}>Invest</Text>
-            </Text>
-            <Text style={styles.brandSubtitle}>
-              {"Pakistan's Premier AI Due Diligence Hub"}
-            </Text>
-          </View>
+          <Hero mode={mode} />
 
-          {/* Mode Switcher Tabs */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tab, mode === 'signin' && styles.activeTab]}
-              onPress={() => {
-                setMode('signin');
-                setErrorMessage(null);
-              }}
-              disabled={isLoading}
-              accessibilityLabel="Switch to Sign In mode"
-            >
-              <Text
-                style={[styles.tabText, mode === 'signin' && styles.activeTabText]}
-              >
-                Sign In
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, mode === 'signup' && styles.activeTab]}
-              onPress={() => {
-                setMode('signup');
-                setErrorMessage(null);
-              }}
-              disabled={isLoading}
-              accessibilityLabel="Switch to Create Account mode"
-            >
-              <Text
-                style={[styles.tabText, mode === 'signup' && styles.activeTabText]}
-              >
-                Create Account
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <Segmented mode={mode} setMode={(m) => { setMode(m); setErrorMessage(null); }} disabled={isLoading} />
 
-          {/* Form Area */}
-          <View style={styles.formContainer}>
-            {/* Error Message Display */}
-            {errorMessage && (
-              <View style={styles.errorBox}>
-                <Ionicons
-                  name="alert-circle-outline"
-                  size={18}
-                  color="#ef4444"
-                  style={{ marginRight: 8 }}
-                />
-                <Text style={styles.errorText}>{errorMessage}</Text>
-              </View>
-            )}
+          <View style={styles.formCol}>
+            {errorMessage && <ErrorBanner message={errorMessage} />}
 
-            {/* Full Name field (Signup Only) */}
-            {mode === 'signup' && (
-              <View style={styles.fieldWrapper}>
-                <Text style={styles.fieldLabel}>FULL NAME</Text>
-                <View
-                  style={[
-                    styles.inputContainer,
-                    focusName && styles.inputContainerFocused,
-                  ]}
-                >
-                  <Ionicons
-                    name="person-outline"
-                    size={16}
-                    color={focusName ? '#818cf8' : 'rgba(255,255,255,0.3)'}
-                    style={styles.fieldIcon}
-                  />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="e.g. Ali Rizvi"
-                    placeholderTextColor="rgba(255,255,255,0.25)"
-                    value={name}
-                    onChangeText={(t) => {
-                      setName(t);
-                      if (errorMessage) setErrorMessage(null);
-                    }}
-                    autoCapitalize="words"
-                    onFocus={() => setFocusName(true)}
-                    onBlur={() => setFocusName(false)}
-                    editable={!isLoading}
-                  />
-                  {name.trim().length >= 2 && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={16}
-                      color="#22c55e"
-                      style={styles.fieldCheckIcon}
-                    />
-                  )}
-                </View>
-              </View>
-            )}
-
-            {/* Email field */}
-            <View style={styles.fieldWrapper}>
-              <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  focusEmail && styles.inputContainerFocused,
-                ]}
-              >
-                <Ionicons
-                  name="mail-outline"
-                  size={16}
-                  color={focusEmail ? '#818cf8' : 'rgba(255,255,255,0.3)'}
-                  style={styles.fieldIcon}
-                />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. investor@vibeinvest.com"
-                  placeholderTextColor="rgba(255,255,255,0.25)"
+            {mode === 'signin' ? (
+              <>
+                <Field
+                  label="Email"
+                  icon="mail-outline"
                   value={email}
-                  onChangeText={(t) => {
-                    setEmail(t);
-                    if (errorMessage) setErrorMessage(null);
-                  }}
-                  autoCapitalize="none"
+                  onChangeText={clearErrorOnChange(setEmail)}
+                  placeholder="rayan@kalaam.vc"
                   keyboardType="email-address"
-                  autoComplete="email"
-                  onFocus={() => setFocusEmail(true)}
-                  onBlur={() => setFocusEmail(false)}
-                  editable={!isLoading}
-                />
-                {isValidEmail(email) && (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={16}
-                    color="#22c55e"
-                    style={styles.fieldCheckIcon}
-                  />
-                )}
-              </View>
-            </View>
-
-            {/* Password field */}
-            <View style={styles.fieldWrapper}>
-              <Text style={styles.fieldLabel}>PASSWORD</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  focusPassword && styles.inputContainerFocused,
-                ]}
-              >
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={16}
-                  color={focusPassword ? '#818cf8' : 'rgba(255,255,255,0.3)'}
-                  style={styles.fieldIcon}
-                />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder={mode === 'signin' ? '••••••••' : 'Min. 6 characters'}
-                  placeholderTextColor="rgba(255,255,255,0.25)"
-                  value={password}
-                  onChangeText={(t) => {
-                    setPassword(t);
-                    if (errorMessage) setErrorMessage(null);
-                  }}
-                  secureTextEntry={!showPassword}
                   autoCapitalize="none"
-                  onFocus={() => setFocusPassword(true)}
-                  onBlur={() => setFocusPassword(false)}
+                  autoComplete="email"
                   editable={!isLoading}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.passwordToggle}
-                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={18}
-                    color="rgba(255,255,255,0.4)"
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
+                <Field
+                  label="Password"
+                  icon="lock-closed-outline"
+                  value={password}
+                  onChangeText={clearErrorOnChange(setPassword)}
+                  placeholder="••••••••"
+                  secure={!showPassword}
+                  autoCapitalize="none"
+                  autoComplete="password"
+                  editable={!isLoading}
+                  rightSlot={passwordEye}
+                />
+                <CTA
+                  label="Sign in to Hub"
+                  icon="log-in-outline"
+                  onPress={handleAuth}
+                  loading={isLoading}
+                />
+              </>
+            ) : (
+              <>
+                <Field
+                  label="Full Name"
+                  icon="person-outline"
+                  value={name}
+                  onChangeText={clearErrorOnChange(setName)}
+                  placeholder="Rayan Khan"
+                  autoCapitalize="words"
+                  autoComplete="name"
+                  editable={!isLoading}
+                />
+                <Field
+                  label="Email"
+                  icon="mail-outline"
+                  value={email}
+                  onChangeText={clearErrorOnChange(setEmail)}
+                  placeholder="you@yourfund.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  editable={!isLoading}
+                />
+                <Field
+                  label="Password"
+                  icon="lock-closed-outline"
+                  value={password}
+                  onChangeText={clearErrorOnChange(setPassword)}
+                  placeholder="Min 8 chars"
+                  secure={!showPassword}
+                  autoCapitalize="none"
+                  editable={!isLoading}
+                  rightSlot={passwordEye}
+                />
+                <StrengthMeter value={password} />
 
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={[styles.btnPrimary, isLoading && styles.btnPrimaryDisabled]}
-              onPress={handleAuth}
-              disabled={isLoading}
-              accessibilityLabel={mode === 'signin' ? 'Submit sign in' : 'Submit sign up'}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons
-                    name={mode === 'signin' ? 'log-in-outline' : 'person-add-outline'}
-                    size={18}
-                    color="#fff"
-                    style={{ marginRight: 6 }}
-                  />
-                  <Text style={styles.btnPrimaryText}>
-                    {mode === 'signin' ? 'Sign In to Hub' : 'Create Investor Account'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
+                <Field
+                  label="Confirm Password"
+                  icon="lock-closed-outline"
+                  value={confirmPassword}
+                  onChangeText={clearErrorOnChange(setConfirmPassword)}
+                  placeholder="Re-enter password"
+                  secure={!showPassword}
+                  autoCapitalize="none"
+                  editable={!isLoading}
+                  rightSlot={
+                    confirmPassword.length > 0 ? (
+                      <Ionicons
+                        name={password === confirmPassword ? 'checkmark-circle' : 'close-circle'}
+                        size={16}
+                        color={password === confirmPassword ? T.green : T.red}
+                      />
+                    ) : undefined
+                  }
+                />
 
-            {/* Divider */}
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
-              <View style={styles.dividerLine} />
-            </View>
+                <CTA
+                  label="Create Account"
+                  icon="person-add-outline"
+                  onPress={handleAuth}
+                  loading={isLoading}
+                />
+              </>
+            )}
 
-            {/* Google Sign In button */}
-            <TouchableOpacity
-              style={[styles.btnGoogle, isLoading && styles.btnGoogleDisabled]}
-              onPress={handleGoogleAuth}
-              disabled={isLoading}
-              accessibilityLabel="Sign in with Google"
-            >
-              <Ionicons
-                name="logo-google"
-                size={16}
-                color="#ea4335"
-                style={{ marginRight: 8 }}
-              />
-              <Text style={styles.btnGoogleText}>
-                {mode === 'signin' ? 'Sign In with Google' : 'Sign Up with Google'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Switch Mode Prompt footer */}
-            <View style={styles.switchModePrompt}>
-              <Text style={styles.switchModePromptText}>
-                {mode === 'signin'
-                  ? "Don't have an investor account?"
-                  : 'Already registered on VibeInvest?'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setMode(mode === 'signin' ? 'signup' : 'signin');
-                  setErrorMessage(null);
-                }}
-                disabled={isLoading}
-              >
-                <Text style={styles.switchModeLink}>
-                  {mode === 'signin' ? ' Create Account' : ' Sign In'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <OrDivider />
+            <GoogleButton onPress={handleGoogle} disabled={isLoading} mode={mode} />
           </View>
+
+          <FooterLink
+            mode={mode}
+            onSwitch={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setErrorMessage(null); }}
+            disabled={isLoading}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
+// ── styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#09090F',
-  },
-  scrollContent: {
+  screen: { flex: 1, backgroundColor: T.bg },
+  scroll: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    justifyContent: 'center',
+    paddingBottom: 28,
   },
-  brandContainer: {
-    alignItems: 'center',
-    marginBottom: 28,
-    marginTop: 20,
+
+  // hero
+  hero: { paddingTop: 56, paddingHorizontal: 24, paddingBottom: 24, alignItems: 'center' },
+  logoImage: {
+    width: 160,
+    height: 160,
+    marginBottom: 4,
   },
-  logo: {
-    width: 64,
-    height: 64,
-    marginBottom: 12,
-  },
-  brandTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: -0.5,
-  },
-  brandSpan: {
-    color: '#818cf8',
-  },
-  brandSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.4)',
-    marginTop: 4,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 24,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: 'rgba(99,102,241,0.15)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(99,102,241,0.4)',
-  },
-  tabText: {
-    fontSize: 13,
+  heroHeadline: {
+    marginTop: 0,
+    fontSize: 28,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.45)',
+    letterSpacing: -0.6,
+    color: T.ink,
+    lineHeight: 32,
+    textAlign: 'center',
   },
-  activeTabText: {
-    color: '#818cf8',
+  heroTagline: {
+    fontSize: 13,
+    color: T.dim,
+    marginTop: 8,
+    lineHeight: 19,
+    textAlign: 'center',
+    maxWidth: 300,
   },
-  formContainer: {
-    gap: 16,
+
+  // segmented
+  segmentedRow: {
+    marginHorizontal: 24,
+    marginBottom: 18,
+    flexDirection: 'row',
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: T.glass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: T.line2,
   },
+  segment: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+  },
+  segmentActive: {
+    backgroundColor: T.purpleSoft,
+    borderWidth: 1,
+    borderColor: T.purpleEdge,
+  },
+  segmentNotch: {
+    position: 'absolute',
+    top: -2,
+    width: 18,
+    height: 1.5,
+    backgroundColor: T.purple,
+    borderRadius: 2,
+  },
+  segmentText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+    color: T.dim,
+  },
+  segmentTextActive: { color: T.purpleInk },
+
+  // form
+  formCol: { paddingHorizontal: 24, gap: 0 },
+
+  // field
+  fieldLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 6,
+  },
+  fieldLabel: {
+    fontFamily: MONO,
+    fontSize: 9.5,
+    color: T.faint,
+    letterSpacing: 1.4,
+  },
+  fieldHint: {
+    fontFamily: MONO,
+    fontSize: 9.5,
+    color: T.faint,
+  },
+  fieldBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: T.fieldBg,
+    borderWidth: 1,
+    borderColor: T.line2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    minHeight: 48,
+  },
+  fieldBoxFocused: {
+    borderColor: T.purpleEdge,
+    backgroundColor: 'rgba(149,80,238,0.06)',
+  },
+  fieldInput: {
+    flex: 1,
+    color: T.ink,
+    fontSize: 14.5,
+    paddingVertical: 12,
+  },
+
+  // strength
+  strengthRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  strengthLabel: {
+    fontFamily: MONO,
+    fontSize: 9.5,
+    color: T.faint,
+    letterSpacing: 0.4,
+  },
+
+  // error
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239,68,68,0.07)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(239,68,68,0.2)',
+    backgroundColor: 'rgba(255,93,108,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,93,108,0.25)',
     borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 4,
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 12,
-    fontWeight: '500',
-    flex: 1,
-  },
-  fieldWrapper: {
-    gap: 6,
-  },
-  fieldLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.3)',
-    letterSpacing: 1,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
     paddingHorizontal: 14,
+    marginBottom: 12,
   },
-  inputContainerFocused: {
-    borderColor: '#6366f1',
-    backgroundColor: 'rgba(99,102,241,0.06)',
+  errorText: { flex: 1, color: T.red, fontSize: 12, fontWeight: '500' },
+
+  // cta
+  ctaTouchable: {
+    width: '100%',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    overflow: 'hidden',
   },
-  fieldIcon: {
-    marginRight: 10,
+  cta: {
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
   },
-  textInput: {
-    flex: 1,
+  ctaText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+
+  // or
+  orRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginVertical: 14,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: T.line2,
+    borderStyle: 'dashed',
+  },
+  orText: {
+    fontFamily: MONO,
+    fontSize: 9.5,
+    color: T.faint,
+    letterSpacing: 1.4,
+  },
+
+  // oauth
+  oauthBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: T.glass,
+    borderWidth: 1,
+    borderColor: T.line2,
+    minHeight: 44,
   },
-  fieldCheckIcon: {
-    marginLeft: 8,
-  },
-  passwordToggle: {
-    padding: 8,
-    marginRight: -4,
-  },
-  btnPrimary: {
-    flexDirection: 'row',
-    width: '100%',
-    paddingVertical: 16,
-    backgroundColor: '#6366f1',
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-  btnPrimaryDisabled: {
-    opacity: 0.6,
-  },
-  btnPrimaryText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 10,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 0.5,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  dividerText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.25)',
-    paddingHorizontal: 12,
-    letterSpacing: 1,
-  },
-  btnGoogle: {
-    flexDirection: 'row',
-    width: '100%',
-    paddingVertical: 14,
-    backgroundColor: 'transparent',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnGoogleDisabled: {
-    opacity: 0.6,
-  },
-  btnGoogleText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 13,
+  oauthText: {
+    color: T.ink,
+    fontSize: 13.5,
     fontWeight: '500',
+    letterSpacing: -0.2,
   },
-  switchModePrompt: {
+
+  // switch mode footer link
+  switchFooter: {
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    paddingBottom: 6,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 12,
   },
-  switchModePromptText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.4)',
+  switchFooterText: {
+    fontSize: 12.5,
+    color: T.dim,
   },
-  switchModeLink: {
-    fontSize: 12,
+  switchFooterLink: {
+    fontSize: 12.5,
     fontWeight: '600',
-    color: '#818cf8',
+    color: T.purpleInk,
+    textDecorationLine: 'underline',
   },
+
 });

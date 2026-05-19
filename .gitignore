@@ -51,6 +51,9 @@ app-example
 frontend/
 google-adk-agent/
 
+# design mocks / scratch
+VibeInvest/
+
 # generated native folders
 /ios
 /android
