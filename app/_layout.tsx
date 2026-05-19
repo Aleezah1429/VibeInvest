@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { View, Image, StyleSheet, Animated, SafeAreaView } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
+import { AuthProvider } from '../context/AuthContext';
 
 // Prevent the splash screen from auto-hiding before our custom animation is ready
 SplashScreen.preventAutoHideAsync();
@@ -48,30 +49,33 @@ export default function RootLayout() {
   const showCustomSplash = !splashAnimationFinished;
 
   return (
-    <ThemeProvider value={DarkTheme}>
-      <View style={styles.container}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#09090F' } }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="search" />
-          <Stack.Screen name="loading" />
-          <Stack.Screen name="handoff" />
-          <Stack.Screen name="report" />
-        </Stack>
-        <StatusBar style="light" />
-        
-        {showCustomSplash && (
-          <Animated.View style={[styles.splashContainer, { opacity }]}>
-            <SafeAreaView style={styles.safeArea}>
-              <Image
-                source={require('../assets/images/vibeinevst-logo.gif')}
-                style={styles.splashImage}
-                resizeMode="contain"
-              />
-            </SafeAreaView>
-          </Animated.View>
-        )}
-      </View>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider value={DarkTheme}>
+        <View style={styles.container}>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#09090F' } }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="auth" />
+            <Stack.Screen name="search" />
+            <Stack.Screen name="loading" />
+            <Stack.Screen name="handoff" />
+            <Stack.Screen name="report" />
+          </Stack>
+          <StatusBar style="light" />
+          
+          {showCustomSplash && (
+            <Animated.View style={[styles.splashContainer, { opacity }]}>
+              <SafeAreaView style={styles.safeArea}>
+                <Image
+                  source={require('../assets/images/vibeinevst-logo.gif')}
+                  style={styles.splashImage}
+                  resizeMode="contain"
+                />
+              </SafeAreaView>
+            </Animated.View>
+          )}
+        </View>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 

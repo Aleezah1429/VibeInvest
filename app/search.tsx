@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, Scro
 import { useRouter } from 'expo-router';
 import { useEffect, useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 import * as DocumentPicker from 'expo-document-picker';
 import { createAnalysis, listAnalyses } from '../services/api';
 import type { AnalysisSummary } from '../services/types';
@@ -25,6 +26,17 @@ function timeAgo(iso: string): string {
 
 export default function SearchScreen() {
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      const timer = setTimeout(() => {
+        router.replace('/auth');
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated]);
+
   const [intent, setIntent] = useState('Invest');
   const [startupName, setStartupName] = useState('');
   const [sector, setSector] = useState('');
@@ -98,6 +110,10 @@ export default function SearchScreen() {
       cancelled = true;
     };
   }, []);
+
+  if (!isAuthenticated) {
+    return null; // Don't render dashboard while redirecting to Auth
+  }
 
   const handleAnalyze = async () => {
     const name = startupName.trim();

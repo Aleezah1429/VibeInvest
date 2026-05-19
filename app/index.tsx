@@ -1,8 +1,24 @@
 import { useRouter } from 'expo-router';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import { useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 export default function SplashScreen() {
   const router = useRouter();
+  const { isAuthenticated, user, signOut } = useAuth();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      const timer = setTimeout(() => {
+        router.replace('/auth');
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated]);
+
+  if (!isAuthenticated) {
+    return null; // Avoid flashing landing page while redirecting to Auth
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -18,6 +34,11 @@ export default function SplashScreen() {
         <Text style={styles.p}>
           AI-powered due diligence on any Pakistan startup — before you write the cheque.
         </Text>
+        {user && (
+          <Text style={styles.welcomeGreeting}>
+            Welcome back, <Text style={styles.hSpan}>{user.name}</Text> 👋
+          </Text>
+        )}
 
         <View style={styles.stats}>
           <View style={styles.statBox}>
@@ -41,6 +62,9 @@ export default function SplashScreen() {
         </TouchableOpacity>
         <TouchableOpacity style={styles.btnGhost} onPress={() => router.push('/search')}>
           <Text style={styles.btnGhostText}>Browse Recent Reports</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnLogout} onPress={signOut} accessibilityLabel="Sign Out of Hub">
+          <Text style={styles.btnLogoutText}>Sign Out of Hub</Text>
         </TouchableOpacity>
 
         <View style={styles.trustRow}>
@@ -140,6 +164,25 @@ const styles = StyleSheet.create({
   btnGhostText: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 13,
+  },
+  welcomeGreeting: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.75)',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  btnLogout: {
+    width: '100%',
+    paddingVertical: 14,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  btnLogoutText: {
+    color: '#ef4444',
+    fontSize: 13,
+    fontWeight: '500',
   },
   trustRow: {
     flexDirection: 'row',

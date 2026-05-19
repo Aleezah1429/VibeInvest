@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .db import init_db
 from .routes.analyses import router as analyses_router
+from .routes.auth import router as auth_router
 
 app = FastAPI(title="VibeInvest API", version="0.1.0")
 
@@ -26,3 +27,4 @@ def health():
 
 
 app.include_router(analyses_router)
+app.include_router(auth_router)

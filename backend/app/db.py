@@ -23,4 +23,5 @@ def get_session():
 
 def init_db():
     from . import models  # noqa: F401  ensure models are imported
+    from . import auth  # noqa: F401  ensure auth models are imported
     Base.metadata.create_all(bind=engine)

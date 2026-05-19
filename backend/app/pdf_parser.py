@@ -1,4 +1,5 @@
 import logging
+# pyrefly: ignore [missing-import]
 from pypdf import PdfReader
 
 log = logging.getLogger("pdf_parser")
