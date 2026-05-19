@@ -204,13 +204,14 @@ def generate_due_diligence_pdf(analysis_data: dict) -> bytes:
     # --- SCORE & VERDICT BLOCK ---
     score = analysis_data.get("score", 0)
     verdict = analysis_data.get("verdict", "WATCH").upper()
+    display_verdict = "REJECTED" if verdict == "PASS" else verdict
     verdict_sub = analysis_data.get("verdict_sub", "").upper()
     v_color = verdict_colors.get(verdict, primary_color)
     
     score_block_data = [
         [
             Paragraph(f"{score}<font size=10> / 1000</font>", score_val_style),
-            Paragraph(f"{verdict}<br/><font size=8>{verdict_sub}</font>" if verdict_sub else verdict, verdict_badge_style)
+            Paragraph(f"{display_verdict}<br/><font size=8>{verdict_sub}</font>" if verdict_sub else display_verdict, verdict_badge_style)
         ],
         [
             Paragraph("AURA SCORE", score_label_style),

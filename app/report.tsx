@@ -269,7 +269,9 @@ export default function ReportScreen() {
               ]
             }
           ]}>
-            <Text style={[styles.stampText, { color: verdictStyle.color }]}>{report.verdict}</Text>
+            <Text style={[styles.stampText, { color: verdictStyle.color }]}>
+              {report.verdict === 'PASS' ? 'REJECTED' : report.verdict}
+            </Text>
           </Animated.View>
 
           {report.verdict_sub ? (
