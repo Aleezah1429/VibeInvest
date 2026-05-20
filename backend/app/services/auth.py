@@ -124,6 +124,45 @@ def signup_user(db: Session, user_data: UserSignUp) -> User:
     db.refresh(db_user)
     return db_user
 
+def update_username(db: Session, user: User, new_name: str) -> User:
+    """Update the user's display name."""
+    cleaned = new_name.strip()
+    if len(cleaned) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Name must be at least 2 characters.",
+        )
+    user.name = cleaned
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def change_password(db: Session, user: User, current_password: str, new_password: str) -> User:
+    """Verify the current password and replace it with a freshly hashed new one."""
+    if not user.hashed_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This account uses Google Sign-In and has no password to change.",
+        )
+    if not verify_password(current_password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect.",
+        )
+    if current_password == new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from the current password.",
+        )
+    user.hashed_password = hash_password(new_password)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def login_user(db: Session, credentials: UserSignIn) -> User:
     """Authenticate email and password credentials, returning the user."""
     email_lower = credentials.email.strip().lower()

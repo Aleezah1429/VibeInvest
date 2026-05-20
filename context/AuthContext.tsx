@@ -1,7 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { apiSignIn, apiSignUp, apiGoogleAuth, setUnauthorizedHandler } from '../services/api';
+import {
+  apiSignIn,
+  apiSignUp,
+  apiGoogleAuth,
+  apiUpdateName,
+  apiChangePassword,
+  setUnauthorizedHandler,
+} from '../services/api';
 
 export interface User {
   name: string;
@@ -16,7 +23,8 @@ interface AuthContextType {
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
-  updateProfile: (updates: Partial<User>) => void;
+  updateProfile: (updates: Partial<User>) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -199,8 +207,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
-  const updateProfile = (updates: Partial<User>) => {
-    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
+  const updateProfile = async (updates: Partial<User>) => {
+    if (updates.name === undefined) return;
+    setIsLoading(true);
+    try {
+      const updated = await apiUpdateName(updates.name);
+      const nextUser: User = { name: updated.name, email: updated.email };
+      setUser(nextUser);
+      setIsLoading(false);
+    } catch (err: any) {
+      setIsLoading(false);
+      throw new Error(getErrorMessage(err));
+    }
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    setIsLoading(true);
+    try {
+      await apiChangePassword(currentPassword, newPassword);
+      setIsLoading(false);
+    } catch (err: any) {
+      setIsLoading(false);
+      throw new Error(getErrorMessage(err));
+    }
   };
 
   return (
@@ -214,6 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithGoogle,
         signOut,
         updateProfile,
+        changePassword,
       }}
     >
       {children}

@@ -240,42 +240,6 @@ function CTA({
   );
 }
 
-// ── OR divider ──────────────────────────────────────────────────────────────
-function OrDivider() {
-  return (
-    <View style={styles.orRow}>
-      <View style={styles.orLine} />
-      <Text style={styles.orText}>OR</Text>
-      <View style={styles.orLine} />
-    </View>
-  );
-}
-
-// ── Google sign-in button ───────────────────────────────────────────────────
-function GoogleButton({
-  onPress,
-  disabled,
-  mode,
-}: {
-  onPress: () => void;
-  disabled?: boolean;
-  mode: 'signin' | 'signup';
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityLabel={mode === 'signin' ? 'Sign in with Google' : 'Sign up with Google'}
-      style={[styles.oauthBtn, disabled && { opacity: 0.6 }]}
-    >
-      <Ionicons name="logo-google" size={16} color="#ea4335" style={{ marginRight: 8 }} />
-      <Text style={styles.oauthText}>
-        {mode === 'signin' ? 'Continue with Google' : 'Sign up with Google'}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
 // ── Switch mode footer link ─────────────────────────────────────────────────
 function FooterLink({
   mode,
@@ -313,7 +277,7 @@ function ErrorBanner({ message }: { message: string }) {
 // ── Main screen ─────────────────────────────────────────────────────────────
 export default function AuthScreen() {
   const router = useRouter();
-  const { signIn, signUp, signInWithGoogle, isLoading, isAuthenticated } = useAuth();
+  const { signIn, signUp, isLoading, isAuthenticated } = useAuth();
   const toast = useToast();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -352,19 +316,6 @@ export default function AuthScreen() {
       const msg = err?.message ?? 'An error occurred during authentication.';
       setErrorMessage(msg);
       toast.show(msg, { type: 'error', title: 'AUTHENTICATION FAILED' });
-    }
-  };
-
-  const handleGoogle = async () => {
-    setErrorMessage(null);
-    try {
-      await signInWithGoogle();
-      toast.show('Welcome back to VibeInvest via Google!', { type: 'success', title: 'SIGNED IN' });
-      router.replace('/');
-    } catch (err: any) {
-      const msg = err?.message ?? 'Google Sign-in failed.';
-      setErrorMessage(msg);
-      toast.show(msg, { type: 'error', title: 'OAUTH ERROR' });
     }
   };
 
@@ -496,9 +447,6 @@ export default function AuthScreen() {
                 />
               </>
             )}
-
-            <OrDivider />
-            <GoogleButton onPress={handleGoogle} disabled={isLoading} mode={mode} />
           </View>
 
           <FooterLink
@@ -670,47 +618,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     letterSpacing: -0.3,
-  },
-
-  // or
-  orRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginVertical: 14,
-  },
-  orLine: {
-    flex: 1,
-    height: 1,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: T.line2,
-    borderStyle: 'dashed',
-  },
-  orText: {
-    fontFamily: MONO,
-    fontSize: 9.5,
-    color: T.faint,
-    letterSpacing: 1.4,
-  },
-
-  // oauth
-  oauthBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    backgroundColor: T.glass,
-    borderWidth: 1,
-    borderColor: T.line2,
-    minHeight: 44,
-  },
-  oauthText: {
-    color: T.ink,
-    fontSize: 13.5,
-    fontWeight: '500',
-    letterSpacing: -0.2,
   },
 
   // switch mode footer link

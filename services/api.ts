@@ -192,6 +192,26 @@ export function apiSignIn(email: string, password: string): Promise<TokenRespons
   });
 }
 
+export function apiUpdateName(name: string): Promise<AuthUser> {
+  return http<AuthUser>('/api/auth/me', {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function apiChangePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<AuthUser> {
+  return http<AuthUser>('/api/auth/me/change-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+}
+
 export function apiGoogleAuth(
   idToken: string,
   name?: string,
