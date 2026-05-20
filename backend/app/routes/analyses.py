@@ -9,6 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, F
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..auth import User
 from ..db import get_session
 from ..models import Analysis, AgentRun, RawEvidence
 from ..schemas import (
@@ -19,6 +20,7 @@ from ..schemas import (
 )
 from ..pdf_parser import extract_text_from_pdf
 from ..pdf_generator import generate_due_diligence_pdf
+from ..services.deps import get_current_user
 
 
 router = APIRouter(prefix="/api/analyses", tags=["analyses"])
@@ -90,10 +92,12 @@ def create_analysis(
     context: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     analysis_id = uuid.uuid4().hex
     analysis = Analysis(
         id=analysis_id,
+        user_id=current_user.id,
         startup_name=name.strip(),
         intent=(intent or "invest").strip().lower(),
         sector=sector,
@@ -146,18 +150,33 @@ def list_analyses(
     limit: int = Query(10, ge=1, le=50),
     status: Optional[str] = None,
     db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
-    stmt = select(Analysis).order_by(Analysis.created_at.desc()).limit(limit)
+    stmt = (
+        select(Analysis)
+        .where(Analysis.user_id == current_user.id)
+        .order_by(Analysis.created_at.desc())
+        .limit(limit)
+    )
     if status:
-        stmt = select(Analysis).where(Analysis.status == status).order_by(Analysis.created_at.desc()).limit(limit)
+        stmt = (
+            select(Analysis)
+            .where(Analysis.user_id == current_user.id, Analysis.status == status)
+            .order_by(Analysis.created_at.desc())
+            .limit(limit)
+        )
     rows = db.execute(stmt).scalars().all()
     return [_to_summary(a) for a in rows]
 
 
 @router.get("/{analysis_id}/pdf")
-def get_analysis_pdf(analysis_id: str, db: Session = Depends(get_session)):
+def get_analysis_pdf(
+    analysis_id: str,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     a = db.get(Analysis, analysis_id)
-    if not a:
+    if not a or a.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Analysis not found")
         
     if not a.report_json:
@@ -187,17 +206,25 @@ def get_analysis_pdf(analysis_id: str, db: Session = Depends(get_session)):
 
 
 @router.get("/{analysis_id}", response_model=AnalysisDetail)
-def get_analysis(analysis_id: str, db: Session = Depends(get_session)):
+def get_analysis(
+    analysis_id: str,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     a = db.get(Analysis, analysis_id)
-    if not a:
+    if not a or a.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Analysis not found")
     return _to_detail(a)
 
 
 @router.delete("/{analysis_id}", status_code=204)
-def delete_analysis(analysis_id: str, db: Session = Depends(get_session)):
+def delete_analysis(
+    analysis_id: str,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
     a = db.get(Analysis, analysis_id)
-    if not a:
+    if not a or a.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Analysis not found")
     db.delete(a)
     db.commit()

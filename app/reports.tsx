@@ -145,7 +145,7 @@ export default function ReportsScreen() {
                 <ReportCard
                   key={r.id}
                   report={r}
-                  onPress={() => router.push({ pathname: '/report', params: { name: r.name } })}
+                  onPress={() => router.push({ pathname: '/report', params: { id: r.id, name: r.name } })}
                 />
               ))}
             </View>

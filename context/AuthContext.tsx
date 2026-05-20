@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { apiSignIn, apiSignUp, apiGoogleAuth } from '../services/api';
+import { apiSignIn, apiSignUp, apiGoogleAuth, setUnauthorizedHandler } from '../services/api';
 
 export interface User {
   name: string;
@@ -71,6 +71,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       saveSession({ user, token: current.token });
     }
   }, [user, isAuthenticated]);
+
+  // If any API call returns 401 (token expired / revoked), force sign-out so
+  // the gates in /index.tsx and /search.tsx redirect to /auth on the next render.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      saveSession(null);
+      setIsAuthenticated(false);
+      setUser(null);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   const triggerHaptic = async (type: 'success' | 'warning' | 'error' | 'light') => {
     try {

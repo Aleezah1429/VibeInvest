@@ -756,6 +756,7 @@ function VerdictPill({ verdict }: { verdict: SavedReport['verdict'] }) {
 }
 
 function AuraScoreCard({ report }: { report: SavedReport }) {
+  const router = useRouter();
   const breakdowns =
     report.breakdowns && report.breakdowns.length > 0
       ? report.breakdowns
@@ -766,7 +767,12 @@ function AuraScoreCard({ report }: { report: SavedReport }) {
         ];
   return (
     <View style={{ paddingHorizontal: 20 }}>
-      <View style={s.auraCardOuter}>
+      <TouchableOpacity
+        onPress={() => router.push({ pathname: '/report', params: { id: report.id, name: report.name } })}
+        activeOpacity={0.85}
+        style={s.auraCardOuter}
+        accessibilityLabel={`View full report for ${report.name}`}
+      >
       <LinearGradient
         colors={['rgba(40,24,72,0.65)', 'rgba(14,11,24,0.85)']}
         locations={[0, 0.6]}
@@ -775,9 +781,9 @@ function AuraScoreCard({ report }: { report: SavedReport }) {
         style={s.auraCard}
       >
         <View style={s.auraEmptyHead}>
-          <View>
+          <View style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
             <Text style={s.eyebrow}>◢ AURA SCORE</Text>
-            <Text style={s.sectionTitle}>{report.name}</Text>
+            <Text style={s.sectionTitle} numberOfLines={1}>{report.name}</Text>
           </View>
           <VerdictPill verdict={report.verdict} />
         </View>
@@ -812,7 +818,7 @@ function AuraScoreCard({ report }: { report: SavedReport }) {
           <Text style={[s.auraFootText, { color: T.purple }]}>Full report →</Text>
         </View>
       </LinearGradient>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -1187,11 +1193,21 @@ export default function DashboardScreen() {
         file,
       });
       router.push({ pathname: '/loading', params: { id: analysis.id, name: payload.name } });
-    } catch (err) {
-      // Backend unreachable or createAnalysis rejected — fall back to demo flow.
-      // The downstream /report screen will show the placeholder + a loadError
-      // hint, so the user still sees the boardroom animation.
-      router.push({ pathname: '/loading', params: { name: payload.name } });
+    } catch (err: any) {
+      // Surface the real reason instead of silently sliding into a placeholder
+      // report — that's what made trending picks feel like "static results".
+      const raw = err?.message || 'Could not start analysis.';
+      let msg = raw;
+      const i = raw.indexOf('{');
+      if (i !== -1) {
+        try {
+          const parsed = JSON.parse(raw.slice(i));
+          if (parsed?.detail) msg = String(parsed.detail);
+        } catch {
+          // not JSON; keep raw
+        }
+      }
+      Alert.alert('Analysis failed', msg);
     }
   };
 
@@ -1226,7 +1242,7 @@ export default function DashboardScreen() {
             <View style={{ height: 6 }} />
             <RecentList
               reports={reports}
-              onPick={(_, name) => router.push({ pathname: '/report', params: { name } })}
+              onPick={(id, name) => router.push({ pathname: '/report', params: { id, name } })}
             />
           </>
         ) : (

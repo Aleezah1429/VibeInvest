@@ -11,6 +11,8 @@ class Analysis(Base):
     __tablename__ = "analyses"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    # Nullable because old rows existed before users were introduced.
+    user_id: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     startup_name: Mapped[str] = mapped_column(String, nullable=False)
     intent: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     sector: Mapped[Optional[str]] = mapped_column(String, nullable=True)

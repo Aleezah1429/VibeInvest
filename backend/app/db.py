@@ -25,3 +25,19 @@ def init_db():
     from . import models  # noqa: F401  ensure models are imported
     from . import auth  # noqa: F401  ensure auth models are imported
     Base.metadata.create_all(bind=engine)
+    _ensure_analyses_user_id()
+
+
+def _ensure_analyses_user_id():
+    """Additive SQLite migration: add analyses.user_id if missing."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "analyses" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("analyses")}
+    if "user_id" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE analyses ADD COLUMN user_id TEXT REFERENCES users(id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_analyses_user_id ON analyses(user_id)"))

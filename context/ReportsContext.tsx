@@ -24,7 +24,7 @@ export interface SavedReport {
 interface ReportsContextType {
   reports: SavedReport[];
   latestReport: SavedReport | null;
-  addReport: (r: Omit<SavedReport, 'id' | 'finishedAt'> & { finishedAt?: string }) => void;
+  addReport: (r: Omit<SavedReport, 'id' | 'finishedAt'> & { id?: string; finishedAt?: string }) => void;
   clearReports: () => void;
 }
 
@@ -35,7 +35,7 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
 
   const addReport = useCallback<ReportsContextType['addReport']>((r) => {
     setReports((prev) => {
-      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const id = r.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const finishedAt = r.finishedAt ?? new Date().toISOString();
       // Dedup by name (most-recent wins) so a re-run replaces the old entry
       // instead of cluttering the recent list.

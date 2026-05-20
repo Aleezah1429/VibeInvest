@@ -455,6 +455,7 @@ export default function ReportScreen() {
               .slice(0, 3)
               .map((d) => ({ label: d.name, val: d.score }));
             addReport({
+              id,
               name: a.report.startup_name,
               score: a.report.score,
               verdict: a.report.verdict,

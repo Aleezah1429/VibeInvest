@@ -14,11 +14,46 @@ function defaultBaseUrl(): string {
 export const API_BASE_URL =
   (process.env.EXPO_PUBLIC_API_BASE_URL as string | undefined) || defaultBaseUrl();
 
+// Mirrors STORAGE_KEY in context/AuthContext.tsx. Kept inline to avoid a
+// circular import (AuthContext imports from this file).
+const AUTH_STORAGE_KEY = 'vibe.auth.session';
+
+function readAuthToken(): string | null {
+  if (Platform.OS !== 'web') return null;
+  const ls = (globalThis as any)?.localStorage;
+  if (!ls) return null;
+  try {
+    const raw = ls.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.token === 'string' ? parsed.token : null;
+  } catch {
+    return null;
+  }
+}
+
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  onUnauthorized = fn;
+}
+
+function authHeaders(): Record<string, string> {
+  const token = readAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+      ...(init?.headers || {}),
+    },
     ...init,
   });
+  if (res.status === 401) {
+    onUnauthorized?.();
+  }
   if (!res.ok) {
     let detail = '';
     try {
@@ -53,7 +88,9 @@ export function createAnalysis(
   return fetch(`${API_BASE_URL}/api/analyses`, {
     method: 'POST',
     body: formData,
+    headers: { ...authHeaders() },
   }).then(async (res) => {
+    if (res.status === 401) onUnauthorized?.();
     if (!res.ok) {
       let detail = '';
       try {
