@@ -122,7 +122,7 @@ export function listAnalyses(limit = 10): Promise<AnalysisSummary[]> {
 export type DashboardVerdict =
   | 'INVEST'
   | 'WATCH'
-  | 'PASS'
+  | 'REJECT'
   | 'ACQUIRE'
   | 'PIVOT'
   | 'ITERATE';

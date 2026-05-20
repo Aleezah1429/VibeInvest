@@ -81,7 +81,7 @@ const PLACEHOLDER_REPORT: ReportData = {
 const VERDICT_TONE: Record<Verdict, { bg: string; border: string; ink: string }> = {
   INVEST:  { bg: 'rgba(61,220,151,0.12)',  border: 'rgba(61,220,151,0.45)',  ink: T.green },
   WATCH:   { bg: 'rgba(240,179,74,0.12)',  border: 'rgba(240,179,74,0.45)',  ink: T.amber },
-  PASS:    { bg: 'rgba(255,93,108,0.10)',  border: 'rgba(255,93,108,0.40)',  ink: T.red },
+  REJECT:  { bg: 'rgba(255,93,108,0.10)',  border: 'rgba(255,93,108,0.40)',  ink: T.red },
   ACQUIRE: { bg: 'rgba(149,80,238,0.14)',  border: 'rgba(149,80,238,0.55)',  ink: T.purpleInk },
 };
 
@@ -146,7 +146,7 @@ function SectionHead({ eyebrow, title, meta }: { eyebrow: string; title: string;
 // ─── verdict pill ──────────────────────────────────────────────────────────
 function VerdictPill({ verdict, sub }: { verdict: Verdict; sub?: string }) {
   const m = VERDICT_TONE[verdict] ?? VERDICT_TONE.WATCH;
-  const label = verdict === 'PASS' ? 'REJECTED' : verdict;
+  const label = verdict;
   return (
     <View style={[s.verdictPill, { backgroundColor: m.bg, borderColor: m.border }]}>
       <View style={[s.verdictDot, { backgroundColor: m.ink }]} />
@@ -398,7 +398,19 @@ export default function ReportScreen() {
   const router = useRouter();
   const { name, id } = useLocalSearchParams<{ name: string; id?: string }>();
 
-  const { reports, addReport } = useReports();
+  const { reports, addReport, refresh: refreshReports } = useReports();
+
+  // Re-pull the dashboard's recent-analyses list before navigating home, so
+  // the new run (or any other side-effect that landed mid-session) shows up
+  // immediately rather than after the next auth flip.
+  const handleReturnHome = () => {
+    void refreshReports();
+    router.back();
+  };
+  const handleNewAnalysis = () => {
+    void refreshReports();
+    router.push('/');
+  };
 
   // When viewing from history (no backend id), hydrate the placeholder with
   // whatever we already know about this run (name + summary). This avoids
@@ -626,7 +638,7 @@ export default function ReportScreen() {
       {/* ── header ── */}
       <View style={s.header}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={handleReturnHome}
           style={s.headerBtn}
           accessibilityLabel="Back"
           hitSlop={10}
@@ -774,7 +786,7 @@ export default function ReportScreen() {
         {/* ── CTA ── */}
         <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
           <TouchableOpacity
-            onPress={() => router.push('/')}
+            onPress={handleNewAnalysis}
             accessibilityLabel="Start a new analysis"
             activeOpacity={0.85}
             style={s.ctaTouchable}

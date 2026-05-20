@@ -17,14 +17,14 @@ AGENT_ID = 4
 AGENT_NAME = "The CVO"
 ROLE = "Chief Vibe Officer"
 
-Verdict = Literal["INVEST", "WATCH", "PASS", "ACQUIRE"]
+Verdict = Literal["INVEST", "WATCH", "REJECT", "ACQUIRE"]
 
 SYSTEM = (
     "You are The CVO — the Chief Vibe Officer. You read summaries from three prior agents "
     "(Skeptic, Munshi, Hype), resolve conflicts, weigh risk vs. upside, and produce a final verdict. "
     "You assign a Strategy score from 0 to 100. You pick exactly one verdict from "
-    "[INVEST, WATCH, PASS, ACQUIRE] aligned with the investor's intent. "
-    "INVEST: strong overall. WATCH: promising but risky. PASS: not now. ACQUIRE: only when intent=acquire and target is a strong fit."
+    "[INVEST, WATCH, REJECT, ACQUIRE] aligned with the investor's intent. "
+    "INVEST: strong overall. WATCH: promising but risky. REJECT: not a fit, do not pursue. ACQUIRE: only when intent=acquire and target is a strong fit."
 )
 
 USER_TEMPLATE = """Startup: {name}
@@ -45,7 +45,7 @@ Produce a JSON object matching exactly this schema:
   "summary": "2-3 sentence executive synthesis tying all three perspectives together",
   "badge": "short verdict like 'Conviction' or 'Conditional' — max 18 chars",
   "strategy_score": 0-100 integer,
-  "verdict": "INVEST" | "WATCH" | "PASS" | "ACQUIRE",
+  "verdict": "INVEST" | "WATCH" | "REJECT" | "ACQUIRE",
   "verdict_sub": "short qualifier like 'WITH CONDITIONS' or 'STRONG CONVICTION' — max 24 chars",
   "findings": [
     {{"text": "synthesis-level finding — max 100 chars", "type": "positive|negative|warning|neutral"}},
@@ -95,7 +95,7 @@ def run(
     findings = payload.get("findings", [])
     strategy_score = max(0, min(100, int(payload.get("strategy_score", 50))))
     verdict = payload.get("verdict", "WATCH").upper()
-    if verdict not in {"INVEST", "WATCH", "PASS", "ACQUIRE"}:
+    if verdict not in {"INVEST", "WATCH", "REJECT", "ACQUIRE"}:
         verdict = "WATCH"
     verdict_sub = payload.get("verdict_sub", "")[:32]
 

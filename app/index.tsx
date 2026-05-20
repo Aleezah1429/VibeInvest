@@ -27,7 +27,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../context/AuthContext';
 import { useReports, SavedReport } from '../context/ReportsContext';
 import { useToast } from '../context/ToastContext';
-import { createAnalysis } from '../services/api';
+import { setPendingAnalysis } from '../services/pendingAnalysis';
 
 // ─── search payload shape ───────────────────────────────────────────────────
 const INTENT_OPTIONS = ['Invest', 'Acquire', 'Research', 'Partner'] as const;
@@ -727,7 +727,7 @@ function VerdictPill({ verdict }: { verdict: SavedReport['verdict'] }) {
     WATCH:   { bg: 'rgba(240,179,74,0.12)',  border: 'rgba(240,179,74,0.45)',  ink: T.amber },
     PIVOT:   { bg: 'rgba(240,179,74,0.12)',  border: 'rgba(240,179,74,0.45)',  ink: T.amber },
     ACQUIRE: { bg: 'rgba(149,80,238,0.14)',  border: 'rgba(149,80,238,0.55)',  ink: T.purpleInk },
-    PASS:    { bg: 'rgba(255,93,108,0.10)',  border: 'rgba(255,93,108,0.40)',  ink: T.red },
+    REJECT:  { bg: 'rgba(255,93,108,0.10)',  border: 'rgba(255,93,108,0.40)',  ink: T.red },
   };
   const m = map[verdict] ?? map.WATCH;
   return (
@@ -1144,21 +1144,17 @@ export default function DashboardScreen() {
 
   const hasReports = reports.length > 0;
 
-  // SearchCard → kick off the agent pipeline immediately. Calls createAnalysis
-  // with the full payload, then pushes the user straight to /loading so the
-  // boardroom animation begins. If the backend isn't reachable, we still
-  // navigate to /loading (without an id) so the demo flow runs against the
-  // placeholder report downstream.
-  const goRunDetailed = async (payload: SearchPayload) => {
+  // Navigate to /loading IMMEDIATELY. The actual createAnalysis call runs
+  // inside the loading screen so the boardroom UI appears with zero delay
+  // instead of waiting on the backend's multi-second analyses POST.
+  const goRunDetailed = (payload: SearchPayload) => {
     const d = payload.details;
-    // Match search.tsx's context-string convention: focus + URLs merged.
     const parts: string[] = [];
     if (d?.focus) parts.push(d.focus);
     if (d?.website) parts.push(`Website: ${d.website}`);
     if (d?.linkedin) parts.push(`LinkedIn: ${d.linkedin}`);
     const context = parts.length > 0 ? parts.join(' | ') : undefined;
 
-    // createAnalysis expects { uri, name, type }; DocumentPicker exposes mimeType.
     const file = d?.pitchDeckFile
       ? {
           uri: d.pitchDeckFile.uri,
@@ -1167,33 +1163,16 @@ export default function DashboardScreen() {
         }
       : undefined;
 
-    try {
-      const analysis = await createAnalysis({
-        name: payload.name,
-        intent: payload.intent.toLowerCase(),
-        sector: d?.sector,
-        stage: d?.stage,
-        funding: d?.funding,
-        context,
-        file,
-      });
-      router.push({ pathname: '/loading', params: { id: analysis.id, name: payload.name } });
-    } catch (err: any) {
-      // Surface the real reason instead of silently sliding into a placeholder
-      // report — that's what made trending picks feel like "static results".
-      const raw = err?.message || 'Could not start analysis.';
-      let msg = raw;
-      const i = raw.indexOf('{');
-      if (i !== -1) {
-        try {
-          const parsed = JSON.parse(raw.slice(i));
-          if (parsed?.detail) msg = String(parsed.detail);
-        } catch {
-          // not JSON; keep raw
-        }
-      }
-      toast.show(msg, { type: 'error', title: 'ANALYSIS FAILED' });
-    }
+    setPendingAnalysis({
+      name: payload.name,
+      intent: payload.intent.toLowerCase(),
+      sector: d?.sector,
+      stage: d?.stage,
+      funding: d?.funding,
+      context,
+      file,
+    });
+    router.push({ pathname: '/loading', params: { name: payload.name } });
   };
 
   const handleProfile = () => {

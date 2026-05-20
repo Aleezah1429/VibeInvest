@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useAuth } from './AuthContext';
 import { getRecentAnalyses } from '../services/api';
 
-export type Verdict = 'INVEST' | 'WATCH' | 'PASS' | 'ACQUIRE' | 'PIVOT' | 'ITERATE';
+export type Verdict = 'INVEST' | 'WATCH' | 'REJECT' | 'ACQUIRE' | 'PIVOT' | 'ITERATE';
 
 export interface SavedReport {
   id: string;

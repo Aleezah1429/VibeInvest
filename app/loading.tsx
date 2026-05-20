@@ -10,7 +10,8 @@ import {
   View
 } from 'react-native';
 import { Fonts } from '../constants/theme';
-import { getAnalysis } from '../services/api';
+import { createAnalysis, getAnalysis } from '../services/api';
+import { consumePendingAnalysis } from '../services/pendingAnalysis';
 import { useToast } from '../context/ToastContext';
 import type { AnalysisDetail } from '../services/types';
 
@@ -423,15 +424,58 @@ const SCENES: Record<string, React.FC> = {
 // ── Main Screen ─────────────────────────────────────────────
 export default function LoadingScreen() {
   const router = useRouter();
-  const { name, id } = useLocalSearchParams<{ name: string; id?: string }>();
+  const { name, id: paramId } = useLocalSearchParams<{ name: string; id?: string }>();
   const startupName = name || 'Bykea';
   const toast = useToast();
 
+  // `realId` starts as whatever the URL had (legacy direct nav); otherwise it
+  // is filled in once the createAnalysis POST we kick off here resolves.
+  const [realId, setRealId] = useState<string | undefined>(paramId);
+  const id = realId;
   const [agentIdx, setAgentIdx] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [hasRealRun, setHasRealRun] = useState<boolean>(!!id);
+  const [hasRealRun, setHasRealRun] = useState<boolean>(!!paramId);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const consecutiveFailures = useRef(0);
+
+  // Fire createAnalysis in the background. The dashboard navigated here
+  // immediately and parked the payload in the pendingAnalysis store — so the
+  // user sees the boardroom animation while the POST is still in flight.
+  // On failure we bounce back to the dashboard so the user doesn't sit
+  // through a fake agent ticker for a run that never started.
+  useEffect(() => {
+    if (paramId) return; // already have an id (e.g. legacy direct nav)
+    const pending = consumePendingAnalysis();
+    if (!pending) return; // no pending payload → demo/fake flow keeps running
+    let cancelled = false;
+    createAnalysis(pending)
+      .then((analysis) => {
+        if (!cancelled) setRealId(analysis.id);
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+        const raw = err?.message || 'Could not start analysis.';
+        let msg = raw;
+        const i = raw.indexOf('{');
+        if (i !== -1) {
+          try {
+            const parsed = JSON.parse(raw.slice(i));
+            if (parsed?.detail) msg = String(parsed.detail);
+          } catch {
+            // not JSON; keep raw
+          }
+        }
+        toast.show(msg, { type: 'error', title: 'ANALYSIS FAILED' });
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [paramId, toast, router]);
 
   const handleDone = useCallback(() => {
     router.replace({ pathname: '/handoff', params: { name: startupName, ...(id ? { id } : {}) } });
