@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertTriangle, ArrowRight, CircleDollarSign, Crown, Search, Sparkles } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, CircleDollarSign, Crown, Search, Sparkles } from 'lucide-react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   SafeAreaView,
@@ -10,7 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Fonts } from '../constants/theme';
+import { getAnalysis } from '../services/api';
+import type { AgentReport, AnalysisDetail, Finding } from '../services/types';
 
 // ── Agent Data ──────────────────────────────────────────────
 const AGENTS: Record<string, { icon: any; name: string; role: string; color: string }> = {
@@ -47,6 +51,53 @@ const CHAT_SCRIPT: ChatMessage[] = [
   { agent: 'cvo', text: 'weighting risk × upside × vibe…' },
   { agent: 'cvo', text: 'verdict locked. tap to reveal the aura score.', final: true },
 ];
+
+const AGENT_KEY_BY_ID: Record<number, keyof typeof AGENTS> = {
+  1: 'skeptic',
+  2: 'munshi',
+  3: 'hype',
+  4: 'cvo',
+};
+
+const HANDOFF_LABELS: Record<number, string> = {
+  1: 'skeptic → munshi',
+  2: 'munshi → hype',
+  3: '3 reports → CVO',
+};
+
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.?!])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function findingsToText(findings: Finding[]): { text: string; flag?: boolean }[] {
+  return findings.slice(0, 2).map((f) => ({
+    text: f.text,
+    flag: f.type === 'negative' || f.type === 'warning',
+  }));
+}
+
+function buildScriptFromReports(reports: AgentReport[]): ChatMessage[] {
+  const ordered = [...reports].sort((a, b) => a.id - b.id);
+  const out: ChatMessage[] = [];
+  ordered.forEach((r, i) => {
+    const key = AGENT_KEY_BY_ID[r.id];
+    if (!key) return;
+    const sentences = splitSentences(r.body).slice(0, 2);
+    sentences.forEach((s) => out.push({ agent: key, text: s }));
+    findingsToText(r.findings).forEach((f) =>
+      out.push({ agent: key, text: f.text, flag: f.flag })
+    );
+    if (i < ordered.length - 1) {
+      out.push({ handoff: HANDOFF_LABELS[r.id] || `${key} →` });
+    } else if (r.id === 4) {
+      out[out.length - 1] = { ...out[out.length - 1], final: true };
+    }
+  });
+  return out;
+}
 
 // ── Chat Bubble ─────────────────────────────────────────────
 function ChatBubble({ message }: { message: ChatMessage }) {
@@ -106,7 +157,6 @@ function ChatBubble({ message }: { message: ChatMessage }) {
         <View
           style={[
             styles.bubble,
-            message.final && styles.bubbleFinal,
             message.flag && styles.bubbleFlagged,
           ]}
         >
@@ -116,14 +166,7 @@ function ChatBubble({ message }: { message: ChatMessage }) {
               <Text style={styles.flagBadgeText}>flag</Text>
             </View>
           )}
-          <Text
-            style={[
-              styles.bubbleText,
-              message.final && styles.bubbleTextFinal,
-            ]}
-          >
-            {message.text}
-          </Text>
+          <Text style={styles.bubbleText}>{message.text}</Text>
         </View>
       </View>
     </Animated.View>
@@ -133,18 +176,43 @@ function ChatBubble({ message }: { message: ChatMessage }) {
 // ── Main Handoff Screen ─────────────────────────────────────
 export default function HandoffScreen() {
   const router = useRouter();
-  const { name } = useLocalSearchParams<{ name: string }>();
+  const { name, id } = useLocalSearchParams<{ name: string; id?: string }>();
   const startupName = name || 'Bykea';
 
   const [step, setStep] = useState(0);
+  const [analysis, setAnalysis] = useState<AnalysisDetail | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    if (step >= CHAT_SCRIPT.length) return;
+    if (!id) return;
+    let cancelled = false;
+    getAnalysis(id)
+      .then((a) => {
+        if (!cancelled) setAnalysis(a);
+      })
+      .catch(() => {
+        // fall through to the hardcoded script
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const script = useMemo<ChatMessage[]>(() => {
+    const reports = analysis?.report?.agent_reports;
+    if (reports && reports.length > 0) {
+      const built = buildScriptFromReports(reports);
+      if (built.length > 0) return built;
+    }
+    return CHAT_SCRIPT;
+  }, [analysis]);
+
+  useEffect(() => {
+    if (step >= script.length) return;
     const delay = step === 0 ? 400 : 950;
     const t = setTimeout(() => setStep((s) => s + 1), delay);
     return () => clearTimeout(t);
-  }, [step]);
+  }, [step, script.length]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -152,15 +220,15 @@ export default function HandoffScreen() {
     }, 100);
   }, [step]);
 
-  const messages = CHAT_SCRIPT.slice(0, step);
-  const isDone = step >= CHAT_SCRIPT.length;
+  const messages = script.slice(0, step);
+  const isDone = step >= script.length;
 
   const handleReveal = () => {
-    router.replace({ pathname: '/report', params: { name: startupName } });
+    router.replace({ pathname: '/report', params: { name: startupName, ...(id ? { id } : {}) } });
   };
 
   const handleSkip = () => {
-    router.replace({ pathname: '/report', params: { name: startupName } });
+    router.replace({ pathname: '/report', params: { name: startupName, ...(id ? { id } : {}) } });
   };
 
   return (
@@ -184,13 +252,10 @@ export default function HandoffScreen() {
           </View>
         </View>
 
-        {/* Stacked avatars */}
+        {/* Avatar row (spaced, not stacked) */}
         <View style={styles.avatarStack}>
-          {AGENT_LIST.map((a, i) => (
-            <View
-              key={a.name}
-              style={[styles.stackAvatar, { marginLeft: i > 0 ? -8 : 0, zIndex: 4 - i }]}
-            >
+          {AGENT_LIST.map((a) => (
+            <View key={a.name} style={styles.stackAvatar}>
               <a.icon color={a.color} size={12} />
               <View style={[styles.stackDot, { backgroundColor: a.color }]} />
             </View>
@@ -218,19 +283,24 @@ export default function HandoffScreen() {
         )}
       </ScrollView>
 
-      {/* Reveal CTA */}
+      {/* Reveal CTA — matches the dashboard / auth Start-Analyzing button */}
       {isDone && (
         <Animated.View style={styles.ctaDock}>
           <TouchableOpacity
-            style={styles.revealBtn}
-            activeOpacity={0.85}
             onPress={handleReveal}
+            activeOpacity={0.85}
+            accessibilityLabel="Reveal Aura Score"
+            style={styles.revealTouchable}
           >
-            <Text style={styles.revealText}>Reveal aura score</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Sparkles size={16} color="white" />
-              <ArrowRight size={16} color="white" />
-            </View>
+            <LinearGradient
+              colors={['#9550ee', '#7b3bd9']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={styles.revealBtn}
+            >
+              <Text style={styles.revealText}>Reveal Aura Score</Text>
+              <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 8 }} />
+            </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -273,7 +343,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
   inRoomText: { fontFamily: Fonts.mono, fontSize: 10, color: 'rgba(255,255,255,0.4)' },
-  avatarStack: { flexDirection: 'row', marginTop: 10 },
+  avatarStack: { flexDirection: 'row', marginTop: 10, gap: 10 },
   stackAvatar: {
     width: 24, height: 24, borderRadius: 7,
     backgroundColor: 'rgba(255,255,255,0.08)',
@@ -314,14 +384,10 @@ const styles = StyleSheet.create({
     borderRadius: 14, borderTopLeftRadius: 4,
     paddingVertical: 10, paddingHorizontal: 14,
   },
-  bubbleFinal: {
-    backgroundColor: '#6366f1', borderColor: '#6366f1',
-  },
   bubbleFlagged: {
     borderColor: 'rgba(255,107,107,0.45)',
   },
   bubbleText: { fontSize: 13, lineHeight: 19, color: 'rgba(255,255,255,0.8)' },
-  bubbleTextFinal: { color: '#0A0A0C', fontWeight: '600' },
 
   // Flag badge
   flagBadge: {
@@ -358,11 +424,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18, paddingVertical: 16,
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
   },
-  revealBtn: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    gap: 10, paddingVertical: 17,
-    backgroundColor: '#6366f1', borderRadius: 50,
+  revealTouchable: {
+    width: '100%',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    overflow: 'hidden',
   },
-  revealText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  revealIcon: { fontSize: 18 },
+  revealBtn: {
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  revealText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
 });
