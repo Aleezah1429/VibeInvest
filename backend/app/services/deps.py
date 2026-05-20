@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..auth import User
@@ -10,15 +10,24 @@ from .auth import verify_access_token
 
 def get_current_user(
     authorization: Optional[str] = Header(default=None),
+    token: Optional[str] = Query(default=None),
     db: Session = Depends(get_session),
 ) -> User:
-    if not authorization or not authorization.lower().startswith("bearer "):
+    """Resolve the current user from either the Authorization header (preferred)
+    or a `?token=` query param (used for PDF links opened in an external
+    browser tab where we can't attach headers)."""
+    raw_token: Optional[str] = None
+    if authorization and authorization.lower().startswith("bearer "):
+        raw_token = authorization.split(" ", 1)[1].strip()
+    elif token:
+        raw_token = token.strip()
+
+    if not raw_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing or invalid Authorization header.",
         )
-    token = authorization.split(" ", 1)[1].strip()
-    payload = verify_access_token(token)
+    payload = verify_access_token(raw_token)
     if not payload or not payload.get("sub"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -32,6 +32,12 @@ function readAuthToken(): string | null {
   }
 }
 
+// Exposed so screens that build URLs by hand (PDF download / share) can
+// attach the token without re-reading localStorage themselves.
+export function getAuthToken(): string | null {
+  return readAuthToken();
+}
+
 let onUnauthorized: (() => void) | null = null;
 export function setUnauthorizedHandler(fn: (() => void) | null) {
   onUnauthorized = fn;

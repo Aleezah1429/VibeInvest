@@ -29,7 +29,7 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 
-import { API_BASE_URL, getAnalysis } from '../services/api';
+import { API_BASE_URL, getAnalysis, getAuthToken } from '../services/api';
 import type { AgentReport, ReportData, Verdict } from '../services/types';
 import { findingColor } from '../services/types';
 import { useReports } from '../context/ReportsContext';
@@ -515,17 +515,26 @@ export default function ReportScreen() {
       Alert.alert('Error', 'Cannot download report: No analysis ID available.');
       return;
     }
+    const token = getAuthToken();
+    if (!token) {
+      Alert.alert('Download Failed', 'You need to be signed in to download the report.');
+      return;
+    }
     const pdfUrl = `${API_BASE_URL}/api/analyses/${id}/pdf`;
     const safeName = (startupName || 'report').replace(/\s+/g, '_');
     const filename = `${safeName}_due_diligence.pdf`;
+    const authHeader = { Authorization: `Bearer ${token}` };
 
-    // Pre-flight: surface a friendly error instead of showing the JSON 404 in a new tab.
+    // Pre-flight: surface a friendly error instead of showing the JSON 401/404 in a new tab.
     try {
-      const head = await fetch(pdfUrl, { method: 'GET', headers: { Range: 'bytes=0-0' } });
-      if (!head.ok) {
-        let msg = `HTTP ${head.status}`;
+      const probe = await fetch(pdfUrl, {
+        method: 'GET',
+        headers: { ...authHeader, Range: 'bytes=0-0' },
+      });
+      if (!probe.ok) {
+        let msg = `HTTP ${probe.status}`;
         try {
-          const body = await head.json();
+          const body = await probe.json();
           if (body?.detail) msg = String(body.detail);
         } catch {
           // not JSON — keep status code
@@ -540,7 +549,7 @@ export default function ReportScreen() {
 
     if (Platform.OS === 'web') {
       try {
-        const res = await fetch(pdfUrl);
+        const res = await fetch(pdfUrl, { headers: authHeader });
         const blob = await res.blob();
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -556,10 +565,13 @@ export default function ReportScreen() {
       }
     }
 
+    // Native: external browser can't carry the Authorization header, so we
+    // pass the token as a query param — the backend accepts it as a fallback.
+    const pdfUrlWithToken = `${pdfUrl}?token=${encodeURIComponent(token)}`;
     try {
-      await WebBrowser.openBrowserAsync(pdfUrl);
+      await WebBrowser.openBrowserAsync(pdfUrlWithToken);
     } catch {
-      Linking.openURL(pdfUrl).catch(() => {
+      Linking.openURL(pdfUrlWithToken).catch(() => {
         Alert.alert('Download Failed', 'Could not open the PDF report link.');
       });
     }
@@ -567,21 +579,31 @@ export default function ReportScreen() {
 
   const handleShare = async () => {
     if (!id) return;
-    const pdfUrl = `${API_BASE_URL}/api/analyses/${id}/pdf`;
+    const token = getAuthToken();
+    // Token-bearing URL so the recipient (or the same user in another tab)
+    // can actually open the PDF. For a hackathon scope this is fine; in
+    // production we'd mint a short-lived signed share token instead.
+    const pdfUrl = token
+      ? `${API_BASE_URL}/api/analyses/${id}/pdf?token=${encodeURIComponent(token)}`
+      : `${API_BASE_URL}/api/analyses/${id}/pdf`;
+    const score = report?.score ?? '—';
+    const verdict = report?.verdict ?? '';
+    const message = `VibeInvest due diligence for ${startupName} · Aura ${score} · ${verdict}\n${pdfUrl}`;
+
     if (Platform.OS === 'web') {
       try {
-        if (navigator.clipboard) {
-          await navigator.clipboard.writeText(pdfUrl);
-          Alert.alert('Link Copied', 'The PDF report link has been copied to your clipboard.');
+        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(message);
+          Alert.alert('Link Copied', 'Report link & summary copied to clipboard.');
           return;
         }
       } catch {
-        // fall through
+        // fall through to Share.share
       }
     }
     try {
       await Share.share({
-        message: `VibeInvest due diligence for ${startupName}: ${pdfUrl}`,
+        message,
         url: pdfUrl,
         title: `${startupName} Due Diligence Report`,
       });
@@ -613,14 +635,6 @@ export default function ReportScreen() {
         </TouchableOpacity>
         <Text style={s.headerTitle}>Report</Text>
         <View style={s.headerActions}>
-          <TouchableOpacity
-            onPress={handleShare}
-            style={s.headerBtn}
-            accessibilityLabel="Share report"
-            hitSlop={10}
-          >
-            <Ionicons name="share-outline" size={20} color={T.ink} />
-          </TouchableOpacity>
           <TouchableOpacity
             onPress={handleDownloadPdf}
             style={s.headerBtn}
