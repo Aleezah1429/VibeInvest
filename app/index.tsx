@@ -197,58 +197,61 @@ function Welcome({ firstName }: { firstName: string }) {
   );
 }
 
-// ─── rotating purple halo behind the search card ───────────────────────────
-// Approximates the mock's `conic-gradient(from 0deg, purple, transparent 35%,
-// purple 70%, transparent)` + `filter: blur(14px)` by placing two opposing
-// soft radial blobs on a rectangle and rotating the whole SVG. The two-blob
-// pattern produces the same "double sweep" the conic gradient creates.
+// ─── purple halo behind the search card ─────────────────────────────────────
+// Breathing scale + opacity instead of rotation. Rotating the original
+// rectangular container revealed its rectangular bounds; a centered radial
+// glow that pulses keeps the "alive" feeling without exposing any geometry.
 function SearchCardGlow() {
-  const spinV = useRef(new Animated.Value(0)).current;
+  const breathe = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    // Run 0 → 2 (two full turns) per loop so the iteration boundary is hit
-    // half as often. iterations: -1 + linear easing + native driver keeps
-    // the rotation truly continuous; the asymmetric hot-spot layout below
-    // makes the motion always visually detectable.
     const loop = Animated.loop(
-      Animated.timing(spinV, {
-        toValue: 2,
-        duration: 10000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-        isInteraction: false,
-      }),
-      { iterations: -1 },
+      Animated.sequence([
+        Animated.timing(breathe, {
+          toValue: 1,
+          duration: 3200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+        Animated.timing(breathe, {
+          toValue: 0,
+          duration: 3200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+      ]),
     );
     loop.start();
     return () => loop.stop();
-  }, [spinV]);
-  // 0 → 2 maps to 0° → 720° (two full turns). 720° lands back at the same
-  // orientation as 0°, so the loop wrap is invisible.
-  const rotate = spinV.interpolate({ inputRange: [0, 2], outputRange: ['0deg', '720deg'] });
+  }, [breathe]);
+  const opacity = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.75] });
+  const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.05] });
   return (
     <Animated.View
       pointerEvents="none"
-      style={[s.searchHaloWrap, { transform: [{ rotate }] }]}
+      style={[s.searchHaloWrap, { opacity, transform: [{ scale }] }]}
     >
-      <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <Svg width="100%" height="100%" viewBox="0 0 200 200" preserveAspectRatio="none">
         <Defs>
-          {/* Multi-stop falloff — no more visible stroke at the edge. */}
+          {/* Larger viewBox + the container's negative offsets give the
+              gradient real room to fade. Each blob fades to opacity 0 within
+              its own bounds, so no edge of any rectangle is ever visible. */}
           <RadialGradient id="haloPrimary" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%"   stopColor="#9550ee" stopOpacity={0.95} />
-            <Stop offset="30%"  stopColor="#9550ee" stopOpacity={0.55} />
-            <Stop offset="65%"  stopColor="#9550ee" stopOpacity={0.18} />
+            <Stop offset="0%"   stopColor="#9550ee" stopOpacity={0.9} />
+            <Stop offset="40%"  stopColor="#9550ee" stopOpacity={0.42} />
+            <Stop offset="80%"  stopColor="#9550ee" stopOpacity={0.06} />
             <Stop offset="100%" stopColor="#9550ee" stopOpacity={0} />
           </RadialGradient>
           <RadialGradient id="haloSecondary" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%"   stopColor="#c79bff" stopOpacity={0.7} />
-            <Stop offset="35%"  stopColor="#c79bff" stopOpacity={0.35} />
-            <Stop offset="75%"  stopColor="#c79bff" stopOpacity={0.08} />
+            <Stop offset="0%"   stopColor="#c79bff" stopOpacity={0.6} />
+            <Stop offset="50%"  stopColor="#c79bff" stopOpacity={0.2} />
+            <Stop offset="85%"  stopColor="#c79bff" stopOpacity={0.03} />
             <Stop offset="100%" stopColor="#c79bff" stopOpacity={0} />
           </RadialGradient>
         </Defs>
-        {/* Asymmetric placement (not 180°) so rotation is always visible. */}
-        <Circle cx={48} cy={10} r={88} fill="url(#haloPrimary)" />
-        <Circle cx={22} cy={70} r={68} fill="url(#haloSecondary)" />
+        <Circle cx={100} cy={100} r={100} fill="url(#haloPrimary)" />
+        <Circle cx={100} cy={100} r={100} fill="url(#haloSecondary)" />
       </Svg>
     </Animated.View>
   );
@@ -596,88 +599,86 @@ function MeetAgents({ onHowItWorks }: { onHowItWorks: () => void }) {
 }
 
 // ─── aura ring (svg) — used by both empty + populated ──────────────────────
-function AuraRing({ score, max = 1000 }: { score: number; max?: number }) {
+function AuraRing({ score }: { score: number; max?: number }) {
   const r = 64;
-  const C0 = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(1, score / max));
-  const offset = C0 * (1 - pct);
+  const dotSize = 14;
+
+  // Spin loops forever — Animated.loop continues across renders because spin
+  // is a useRef. Going 0 → 1 maps to 0deg → 360deg, and the next iteration
+  // starts at the same visual position (360 ≡ 0), so the transition is
+  // seamless with no perceptible "reset".
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 6000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+        isInteraction: false,
+      }),
+      { resetBeforeIteration: true },
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [spin]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+
   return (
-    <Svg width={148} height={148} viewBox="0 0 148 148">
-      <Defs>
-        <SvgLinearGradient id="auraRing" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0%" stopColor="#e9d4ff" />
-          <Stop offset="50%" stopColor="#a96bff" />
-          <Stop offset="100%" stopColor="#7d3fdf" />
-        </SvgLinearGradient>
-        <RadialGradient id="auraRingHalo" cx="50%" cy="50%" r="50%">
-          <Stop offset="55%" stopColor="#9550ee" stopOpacity={0} />
-          <Stop offset="78%" stopColor="#9550ee" stopOpacity={0.28} />
-          <Stop offset="100%" stopColor="#9550ee" stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
+    <View style={{ width: 148, height: 148, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Static gradient ring — no rotation, no sharp edges from a moving
+          stroke. */}
+      <Svg
+        width={148}
+        height={148}
+        viewBox="0 0 148 148"
+        style={{ position: 'absolute' }}
+      >
+        <Defs>
+          <SvgLinearGradient id="auraRing" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor="#e9d4ff" />
+            <Stop offset="50%" stopColor="#a96bff" />
+            <Stop offset="100%" stopColor="#7d3fdf" />
+          </SvgLinearGradient>
+        </Defs>
+        <Circle cx={74} cy={74} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={6} fill="none" />
+        {score > 0 && (
+          <Circle cx={74} cy={74} r={r} stroke="url(#auraRing)" strokeWidth={7} fill="none" />
+        )}
+      </Svg>
+
+      {/* Orbiting dot — perfectly round + native shadow = no sharp edges. The
+          dot rides at the top of the rotating frame, so as the frame spins it
+          appears to travel around the ring. */}
       {score > 0 && (
-        <Circle cx={74} cy={74} r={68} fill="url(#auraRingHalo)" />
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: 148,
+            height: 148,
+            transform: [{ rotate }],
+          }}
+        >
+          <View
+            style={{
+              position: 'absolute',
+              top: 74 - r - dotSize / 2,
+              left: 74 - dotSize / 2,
+              width: dotSize,
+              height: dotSize,
+              borderRadius: dotSize / 2,
+              backgroundColor: '#f3e3ff',
+              shadowColor: '#a96bff',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.9,
+              shadowRadius: 10,
+              elevation: 8,
+            }}
+          />
+        </Animated.View>
       )}
-      <Circle cx={74} cy={74} r={r} stroke="rgba(255,255,255,0.06)" strokeWidth={6} fill="none" />
-      {score > 0 && (
-        <>
-          {/* Stacked translucent halos approximate a CSS drop-shadow glow:
-              widest+softest underneath, tightening toward the crisp gradient
-              ring on top. */}
-          <Circle
-            cx={74}
-            cy={74}
-            r={r}
-            stroke="#9550ee"
-            strokeWidth={28}
-            opacity={0.10}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray={C0}
-            strokeDashoffset={offset}
-            transform="rotate(-90 74 74)"
-          />
-          <Circle
-            cx={74}
-            cy={74}
-            r={r}
-            stroke="#a96bff"
-            strokeWidth={18}
-            opacity={0.22}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray={C0}
-            strokeDashoffset={offset}
-            transform="rotate(-90 74 74)"
-          />
-          <Circle
-            cx={74}
-            cy={74}
-            r={r}
-            stroke="#c79bff"
-            strokeWidth={11}
-            opacity={0.45}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray={C0}
-            strokeDashoffset={offset}
-            transform="rotate(-90 74 74)"
-          />
-          <Circle
-            cx={74}
-            cy={74}
-            r={r}
-            stroke="url(#auraRing)"
-            strokeWidth={7}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray={C0}
-            strokeDashoffset={offset}
-            transform="rotate(-90 74 74)"
-          />
-        </>
-      )}
-    </Svg>
+    </View>
   );
 }
 
@@ -1361,10 +1362,10 @@ const s = StyleSheet.create({
   },
   searchHaloWrap: {
     position: 'absolute',
-    top: -28,
-    left: -28,
-    right: -28,
-    bottom: -28,
+    top: -80,
+    left: -80,
+    right: -80,
+    bottom: -80,
     opacity: 0.6,
   },
   searchCardOuter: {
