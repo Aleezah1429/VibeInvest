@@ -40,7 +40,7 @@ const VERDICT_TONE: Record<SavedReport['verdict'], { bg: string; border: string;
   WATCH:   { bg: 'rgba(240,179,74,0.12)',  border: 'rgba(240,179,74,0.45)',  ink: T.amber },
   PIVOT:   { bg: 'rgba(240,179,74,0.12)',  border: 'rgba(240,179,74,0.45)',  ink: T.amber },
   ACQUIRE: { bg: 'rgba(149,80,238,0.14)',  border: 'rgba(149,80,238,0.55)',  ink: T.purpleInk },
-  PASS:    { bg: 'rgba(255,93,108,0.10)',  border: 'rgba(255,93,108,0.40)',  ink: T.red },
+  REJECT:  { bg: 'rgba(255,93,108,0.10)',  border: 'rgba(255,93,108,0.40)',  ink: T.red },
 };
 
 function timeAgo(iso: string): string {

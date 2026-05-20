@@ -2,7 +2,7 @@
 
 export type FindingType = 'positive' | 'negative' | 'warning' | 'neutral';
 export type ChangeType = FindingType;
-export type Verdict = 'INVEST' | 'WATCH' | 'PASS' | 'ACQUIRE';
+export type Verdict = 'INVEST' | 'WATCH' | 'REJECT' | 'ACQUIRE';
 export type AnalysisStatus = 'queued' | 'running' | 'completed' | 'failed';
 
 export interface Finding {

@@ -74,7 +74,7 @@ def generate_due_diligence_pdf(analysis_data: dict) -> bytes:
     verdict_colors = {
         "INVEST": colors.HexColor("#10b981"),
         "WATCH": colors.HexColor("#f59e0b"),
-        "PASS": colors.HexColor("#ef4444"),
+        "REJECT": colors.HexColor("#ef4444"),
         "ACQUIRE": colors.HexColor("#6366f1")
     }
     
@@ -204,7 +204,7 @@ def generate_due_diligence_pdf(analysis_data: dict) -> bytes:
     # --- SCORE & VERDICT BLOCK ---
     score = analysis_data.get("score", 0)
     verdict = analysis_data.get("verdict", "WATCH").upper()
-    display_verdict = "REJECTED" if verdict == "PASS" else verdict
+    display_verdict = verdict
     verdict_sub = analysis_data.get("verdict_sub", "").upper()
     v_color = verdict_colors.get(verdict, primary_color)
     

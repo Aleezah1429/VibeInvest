@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 FindingType = Literal["positive", "negative", "warning", "neutral"]
 ChangeType = Literal["positive", "negative", "warning", "neutral"]
-Verdict = Literal["INVEST", "WATCH", "PASS", "ACQUIRE"]
+Verdict = Literal["INVEST", "WATCH", "REJECT", "ACQUIRE"]
 
 
 class StartupQuery(BaseModel):
