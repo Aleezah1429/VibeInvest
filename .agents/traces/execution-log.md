@@ -1,204 +1,160 @@
 # Execution Log — Step-by-Step Feature Build
 
-> **Trace ID**: `892ab532-e0ea-41be-80ee-7dfb0abfa3b5`
-> **Generated**: 2026-05-17T16:45:00+05:00
+> **Trace ID**: `f3d9c2e1-8a47-4b6e-bf52-1c9e0d4a7b38`
+> **Generated**: 2026-05-21
+> **Supersedes**: trace `892ab532-e0ea-41be-80ee-7dfb0abfa3b5` (2026-05-17)
+
+> Features 1–6 are the UI layer (logs 001–006). Features 7–13 are the backend,
+> auth, and deployment work (logs 007–015) that landed after the prior trace.
 
 ---
 
 ## Feature 1: Custom Animated Splash Screen
 
-**File**: `app/_layout.tsx` (lines 1–97)
-**Commit**: `337a757` — "update splash screen"
+**File**: `app/_layout.tsx`
 
-### Steps
-1. Called `SplashScreen.preventAutoHideAsync()` at module level to hold the native splash
-2. Created `appReady` state — set to `true` after a 100ms prep delay
-3. On `appReady`, called `SplashScreen.hideAsync()` to dismiss the native splash
-4. Rendered a custom `Animated.View` overlay (zIndex 9999) with the brand GIF (`vibeinevst-logo.gif`)
-5. After 3500ms (GIF animation duration), triggered a 600ms `Animated.timing` fade-out
-6. On fade completion, set `splashAnimationFinished = true` to unmount the overlay
-7. The Stack navigator renders underneath — the home screen is ready when the splash fades
+1. `SplashScreen.preventAutoHideAsync()` at module level holds the native splash.
+2. `appReady` flips true after a 100 ms prep delay → `SplashScreen.hideAsync()`.
+3. A custom `Animated.View` overlay (zIndex 9999) renders the brand GIF.
+4. After 3500 ms, a 600 ms `Animated.timing` fade-out runs; on completion the overlay unmounts.
 
-### Architecture Decision
-The splash is an **overlay above the navigator**, not a separate screen. This means navigation is functional even during the splash animation. The `absoluteFillObject` + `zIndex: 9999` pattern ensures the splash covers everything.
+The splash is an overlay above the navigator, not a route — navigation is live underneath.
 
 ---
 
-## Feature 2: Home Screen
+## Feature 2: Home Screen / Dashboard
 
-**File**: `app/index.tsx` (lines 1–162)
-**Commit**: `58af9a7` — "UI, theme and logo in /docs"
+**File**: `app/index.tsx` (1905 lines)
 
-### Steps
-1. Created `SafeAreaView` container with `#09090F` background
-2. Added `Image` component for `VI-logo.png` (80×80, contain)
-3. Built branded title: "Vibe" (white) + "Invest" (indigo `#818cf8`)
-4. Added tagline text with 45% white opacity
-5. Created 3 stat boxes in a flex row: "4 AI agents", "5m avg report", "PKR native data"
-6. Added primary CTA ("Analyze a Startup") → `router.push('/search')`
-7. Added ghost CTA ("Browse Recent Reports") → also `router.push('/search')`
-8. Added trust indicator: green dot + "Trusted by 200+ investors" text
-
-### Pattern
-Top section (flex: 1, centered content) + bottom section (fixed CTAs with padding). Two-part layout common in onboarding screens.
+1. `SafeAreaView` on `#09090F`, brand wordmark, tagline, stat boxes.
+2. Trending picks — startup cards that route into the real analysis pipeline via `goRunDetailed`.
+3. Dashboard surfaces recent analyses through `getRecentAnalyses()`.
+4. Auth gate — unauthenticated users are redirected to `/auth`.
 
 ---
 
-## Feature 3: Search Screen
+## Feature 3: Search Screen + Pitch-Deck Upload
 
-**File**: `app/search.tsx` (lines 1–148)
-**Commit**: `58af9a7` → refined in `a02aead`
+**File**: `app/search.tsx` (410 lines)
 
-### Steps
-1. Created top bar with back button (circular, 34×34, glassmorphic) and "New Analysis" title
-2. Built hero section: "Which startup are you researching?" with indigo accent
-3. Added search input box with search icon, indigo border glow, placeholder examples
-4. Implemented intent selector: 4 `TouchableOpacity` buttons with active/inactive styling
-5. Built 4 optional context fields: Sector, Stage, Funding, Concern area
-6. Added hardcoded recent reports list: Bykea (emoji 🛵, score 712) + Bazaar (emoji 🛒, score 841)
-7. Added "Run Due Diligence" CTA with sparkles icon → navigates to `/loading` with `{ name: startupName || 'Bykea' }`
-
-### State Management
-- `startupName`: controlled TextInput state
-- `intent`: string state, defaults to `'Invest'`
-- Context fields: TextInputs exist but their values are **not captured in state** or passed to navigation
+1. Controlled `startupName` input + intent selector (Invest / Acquire / Research / Partner).
+2. Optional context fields — sector, stage, funding, concern.
+3. `expo-document-picker` lets the user attach a pitch-deck PDF.
+4. "Run Due Diligence" → `createAnalysis()` POSTs multipart form-data → navigates to `/loading` with the analysis `id`.
 
 ---
 
-## Feature 4: Loading Screen — Agent Animations
+## Feature 4: Loading Screen — Agent Scenes + Real Poll Loop
 
-**File**: `app/loading.tsx` (lines 1–728)
-**Commits**: `58af9a7`, `cdb85ad`, `deb6105`
+**File**: `app/loading.tsx` (781 lines)
 
-### Steps
-
-#### 4a. Agent Data Structure (lines 16–69)
-Defined `AGENTS` array with 4 entries, each containing:
-- `key`: string identifier (skeptic, munshi, hype, cvo)
-- `icon`: Lucide icon component
-- `name` / `role`: display strings
-- `color`: hex color for theming
-- `sayings`: 4 contextual messages shown during that agent's turn
-
-#### 4b. SkepticScene (lines 72–129)
-1. Created 15 terminal-style log lines simulating web scraping
-2. Used `Animated.loop` with `Animated.timing` (8s, linear) for continuous upward scroll
-3. Duplicated lines array `[...lines, ...lines]` for seamless loop
-4. Added red scanline overlay (`rgba(255,107,107,0.03)`)
-5. Added `PulsingDot` indicator (top-right corner)
-
-#### 4c. MunshiScene (lines 132–204)
-1. Created 13 financial metric lines (GMV, CAC, LTV, margins, runway)
-2. Same scroll animation pattern (7s duration)
-3. Added live burn rate counter: `setInterval` cycling through 5 values every 380ms
-4. Rendered counter as a lime `#D4FF3D` overlay card with Banknote icon
-
-#### 4d. HypeScene (lines 207–288)
-1. Created 5 sparkle particle positions
-2. Animated each with staggered `Animated.sequence` (300ms delays, 900ms pulse)
-3. Added glitch text "ICONIC" with `Animated.loop` shake (±3px translateX)
-4. Positioned social stats at top and bottom: "scraping social", "12.4k followers", "brand sentiment +84%"
-
-#### 4e. CVOScene (lines 291–385)
-1. Created rotating ring (130×130, `#FFC83C` border) with 5s continuous spin
-2. Placed Crown icon at center (absolute positioned)
-3. Added 3 orbiting nodes (Search, CircleDollarSign, Sparkles icons) with pulsing opacity/scale
-4. Positioned synthesis stats: "synthesizing 47 datapoints", "resolving 3 conflicts"
-
-#### 4f. Main Loading Screen (lines 418–561)
-1. Read `name` from `useLocalSearchParams`
-2. Managed `agentIdx` (0–3) and `progress` (0–1) state
-3. Used `requestAnimationFrame` loop with 3200ms duration per agent
-4. On progress completion: advance `agentIdx` or navigate to `/handoff`
-5. Rendered agent header (icon, role, name) + current saying
-6. Rendered the active Scene component via `SCENES[agent.key]`
-7. Built progress strip: 4 segments with color-coded fills
-8. Added skip button → `router.replace('/report')`
+1. Four themed scenes — SkepticScene (terminal scrape), MunshiScene (financial ticker), HypeScene (glitch text), CVOScene (orbiting ring).
+2. `pollAnalysis()` polls `GET /api/analyses/{id}` every 2 s under the animation.
+3. Progress strip reflects real `AgentProgress[]` from the response.
+4. Fail-safe — silent on transient poll errors, warning toast after 3, error toast + exit after 8 consecutive.
+5. On `status: completed` → navigates to `/handoff`; on `failed` → error toast.
 
 ---
 
 ## Feature 5: Handoff Screen — Agent Chat Room
 
-**File**: `app/handoff.tsx` (lines 1–369)
-**Commit**: `cdb85ad`
+**File**: `app/handoff.tsx` (448 lines)
 
-### Steps
-1. Defined `CHAT_SCRIPT`: 13 agent messages + 3 handoff dividers + 1 final CVO message
-2. Created `ChatBubble` component with slide-up (20→0px) + fade-in (0→1) animation (300ms)
-3. Implemented handoff dividers: dashed line + "skeptic → munshi" text + dashed line
-4. Added flag badge for risk messages (red AlertTriangle icon + "FLAG" label)
-5. Styled final CVO message with primary color (`#6366f1`) background
-6. Auto-played messages via `useEffect` + `setTimeout` chain (400ms initial, 950ms per message)
-7. Auto-scrolled to bottom via `scrollRef.current?.scrollToEnd()`
-8. Showed typing indicator ("●●●") while messages are still playing
-9. Displayed "Reveal aura score" CTA (full-width, indigo, with Sparkles + ArrowRight icons) on completion
-10. Built header: live dot + "agent room · live" label, startup name, "4 in room" badge, stacked agent avatars
+1. Scripted `CHAT_SCRIPT` — agent messages, handoff dividers, final CVO message.
+2. `ChatBubble` slide-up + fade-in animation; auto-play via `setTimeout` chain; auto-scroll.
+3. Flag badges on risk messages; typing indicator during playback.
+4. "Reveal aura score" CTA → `/report`.
 
 ---
 
 ## Feature 6: Report Screen — Score Reveal + Full Report
 
-**File**: `app/report.tsx` (lines 1–376)
-**Commits**: `cdb85ad`, `a02aead`
+**File**: `app/report.tsx` (1194 lines)
 
-### Steps
-
-#### 6a. Score Animation (lines 50–75)
-1. Initialized `score` state at 0
-2. Used `requestAnimationFrame` loop over 1500ms with cubic easing: `1 - Math.pow(1 - progress, 3)`
-3. Animated from 0 → 712 with eased deceleration
-4. On completion, triggered `Animated.spring` on the stamp (friction: 4, tension: 40)
-
-#### 6b. INVEST Stamp (lines 107–123)
-1. Created `stampAnim` (Animated.Value starting at 0)
-2. Stamp scales from 2× → 1× while fading in (opacity 0→1)
-3. Rotated -5° for a "rubber stamp" aesthetic
-4. Green border (`#22c55e`) + green text + 5% green background
-5. "WITH CONDITIONS" subtitle fades in with the stamp
-
-#### 6c. Startup Details (lines 126–139)
-1. Bike icon in indigo card (52×52)
-2. Startup name (dynamic from params)
-3. Tag row: Mobility, Series A, Karachi, B2C
-
-#### 6d. Dimension Scores (lines 141–147)
-Built `DimItem` inline component: icon + name + horizontal bar + score number
-- Market fit: 78, indigo
-- Financials: 63, green
-- Brand power: 81, purple
-- Strategy: 70, amber
-
-#### 6e. Key Metrics (lines 149–155)
-Built `MetricCard` inline component: label + large value + colored change indicator
-- Est. valuation: $28M, +12% YoY (green)
-- Monthly GMV: ₨ 2.4B, Growing (green)
-- Burn rate: $180K, High risk (red)
-- Runway: 14 mo, Watch (amber)
-
-#### 6f. Agent Reports (lines 157–181)
-Built `AgentCard` inline component with expand/collapse toggle. Only 2 cards rendered:
-- Skeptic: 3 flags badge, body text about regulatory risk, 2 findings
-- Munshi: Borderline badge, body about unit economics, 2 findings
-
-#### 6g. Deliverables (lines 183–235)
-Defined `DELIVERABLES` array with 3 items:
-- Investor Brief: FileText icon, indigo, 4 bullets
-- Questions to Ask: FileQuestion icon, purple, 3 bullets
-- Deal Memo Draft: FileEdit icon, amber, 4 bullets
-
-Each deliverable: accordion header with left color bar → expandable body with numbered bullets + Download/Share CTAs.
+1. Aura Score count-up (0 → score) with cubic easing; verdict stamp with `Animated.spring`.
+2. `PASS` renders as a red **REJECTED** stamp.
+3. Dimension bars, key-metric grid, expandable agent report cards — all bound to live `ReportData`.
+4. Master **PDF** and **Share** controls in the header.
+5. Deliverables accordion; "New Analysis" CTA → `/search`.
 
 ---
 
-## Feature 7: Custom Glassmorphic Toast Notification System
+## Feature 7: FastAPI Backend — 4-Agent Pipeline
 
-**Files**: `context/ToastContext.tsx` (created), `app/_layout.tsx` (modified), `app/search.tsx` (modified), `app/index.tsx` (modified), `app/loading.tsx` (modified), `app/auth.tsx` (modified), `app/profile.tsx` (modified)
-**Commit**: `feat: custom glassmorphic toast notification system`
+**Files**: `backend/app/` (23 modules)
 
-### Steps
-1. **Designed Toast Context** — Created `ToastProvider` and custom `useToast()` hook inside `context/ToastContext.tsx` to control toast show, hide, timer decay, and animation configurations.
-2. **Built Glassmorphic Card** — Configured an animated card using `BlurView` from `expo-blur`, custom glow overlay layers, status iconography, and exact notch safe insets via `react-native-safe-area-context`.
-3. **Mounted Provider Globally** — Incorporated the provider inside `app/_layout.tsx` surrounding the main Stack navigator to render floating toasts on top of all stack routes.
-4. **Wired up Screens** — Replaced raw native alerts with `toast.show(...)` across `app/search.tsx`, `app/index.tsx`, and `app/auth.tsx` for credential actions, search inputs, and document upload failures.
-5. **Polling Stabilizers** — Added state references in `app/loading.tsx` to capture intermittent database errors and network dropouts: warning on 3 consecutive polling failures and escaping safely on 8 consecutive dropouts.
-6. **Corrected Linter Warnings** — Cleaned up unused variables and escaped unescaped JSX quotes in `app/index.tsx` and `app/profile.tsx` to maintain strict quality standards.
+1. `main.py` — FastAPI app, CORS, `/health`, startup `init_db()`.
+2. `models.py` — ORM tables `users`, `analyses`, `agent_runs`, `raw_evidence`.
+3. `agents/` — `base.py` plus `skeptic`, `munshi`, `hype`, `cvo`; `tools.py` (incl. Tavily web search).
+4. `orchestrator.py` runs the agents in sequence and records `agent_runs`.
+5. `scoring.py` synthesizes agent output into the Aura Score (/1000) + verdict.
+6. `routes/analyses.py` — `POST /api/analyses` (multipart), `GET /{id}`, list, `recent`, `DELETE`.
+7. `services/api.ts` + `types.ts` — typed client and a 1:1 mirror of `schemas.py`.
+
+---
+
+## Feature 8: Authentication — Frontend + Backend
+
+**Files**: `app/auth.tsx`, `context/AuthContext.tsx`, `backend/app/auth.py`, `routes/auth.py`, `services/{auth,google_auth,deps}.py`
+
+1. Backend `auth.py` — PBKDF2-SHA256 password hashing + HMAC-SHA256 signed tokens (std lib only).
+2. `routes/auth.py` — `signup`, `signin`, `google`, `me` (PATCH name), `me/change-password`.
+3. `google_auth.py` verifies Google ID tokens via `httpx`.
+4. Frontend `auth.tsx` — signup / signin / Google with validation + haptics.
+5. `AuthContext` calls the real API, parses backend `HTTPException.detail`, persists the session on web via `localStorage`.
+6. Route guards on `index`/`search`; `/auth` redirects already-authenticated users to `/`.
+
+---
+
+## Feature 9: ReportLab PDF Generation
+
+**Files**: `backend/app/pdf_generator.py`, `routes/analyses.py`, `app/report.tsx`
+
+1. `pdf_generator.py` compiles a multi-page investor PDF with ReportLab — verdict badge, dimensions, metrics, agent briefs.
+2. `GET /api/analyses/{id}/pdf` streams it — **declared before** the generic `/{id}` route to avoid mis-matching.
+3. Report header gets master **PDF** / **Share** pills.
+4. Web → real file save (hidden `<a download>`); native → `expo-web-browser` / share sheet; web Share copies the link to clipboard.
+
+---
+
+## Feature 10: Per-User Data Scoping
+
+**Files**: `backend/app/models.py`, `routes/analyses.py`, `services/deps.py`, `services/api.ts`
+
+1. Added nullable `user_id` to `analyses` (additive `ALTER TABLE` at startup — existing rows survive as orphans).
+2. `get_current_user` dependency (`deps.py`) decodes the HMAC token on every analyses route.
+3. Ownership enforced on GET / PDF / DELETE; list filtered to the caller.
+4. Frontend `authHeaders()` attaches `Authorization: Bearer`; a 401 clears the session and bounces to `/auth`.
+
+---
+
+## Feature 11: Glassmorphic Toast Notification System
+
+**Files**: `context/ToastContext.tsx`, `app/_layout.tsx`, + 5 screens
+
+1. `ToastProvider` + `useToast()` — show/hide, timer decay, animation config.
+2. `BlurView` glass card with glow layers, status icons, notch-safe insets, ≥44 pt touch target.
+3. `ToastProvider` wraps the Stack in `_layout.tsx` for global floating overlays.
+4. `toast.show(...)` replaces native `Alert` across search, index, loading, auth, profile.
+
+---
+
+## Feature 12: SQLite → PostgreSQL Migration
+
+**Files**: `backend/app/config.py`, `db.py`, `requirements.txt`, `DEPLOY.md`
+
+1. `config.py:_resolve_database_url()` — reads `DATABASE_URL`/`POSTGRES_URL`, normalizes the legacy `postgres://` scheme.
+2. `db.py` — `IS_SQLITE` gate; `pool_pre_ping` + `pool_recycle` for managed Postgres.
+3. `psycopg2-binary` added to `requirements.txt`.
+4. `DEPLOY.md` — canonical Railway deployment checklist.
+
+---
+
+## Feature 13: Railway Deployment + EAS / APK Config
+
+**Files**: `eas.json`, `.env`, `.gitignore`
+
+1. Backend deployed to Railway — `backend/` root dir, `Procfile` start command, Postgres service linked via `DATABASE_URL` reference.
+2. `init_db()` provisions all tables on first boot.
+3. Verified live — `/health` 200, `/api/auth/signin` 401 + valid JSON (DB + auth confirmed).
+4. `EXPO_PUBLIC_API_BASE_URL` set in `.env` (local dev) and every `eas.json` build profile (APK builds) → `https://vibeinvest-backend-production.up.railway.app`.

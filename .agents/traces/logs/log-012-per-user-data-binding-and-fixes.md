@@ -1,5 +1,5 @@
 ---
-log_id: 011
+log_id: 012
 title: Per-User Analyses Binding, Session Persistence, PDF Download, and Trending Fixes
 date: 2026-05-20
 status: completed

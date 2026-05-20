@@ -1,69 +1,47 @@
 # Outcomes — Current State & Next Steps
 
-> **Trace ID**: `892ab532-e0ea-41be-80ee-7dfb0abfa3b5`
-> **Generated**: 2026-05-17T16:45:00+05:00
+> **Trace ID**: `f3d9c2e1-8a47-4b6e-bf52-1c9e0d4a7b38`
+> **Generated**: 2026-05-21
+> **Supersedes**: trace `892ab532-e0ea-41be-80ee-7dfb0abfa3b5` (2026-05-17)
 
 ---
 
-## What Works (Demo-Ready)
+## Headline
 
-| Feature | Screen | Quality |
-|---------|--------|---------|
-| Custom GIF splash with cinematic fade-out | `_layout.tsx` | ✅ Polished |
-| Home screen with branding, stats, CTAs | `index.tsx` | ✅ Polished |
-| Search form with startup input + intent selector | `search.tsx` | ✅ Polished |
-| 4 unique agent loading animations | `loading.tsx` | ✅ Exceptional |
-| Agent progress strip with color-coded fills | `loading.tsx` | ✅ Polished |
-| Agent sayings rotation during loading | `loading.tsx` | ✅ Polished |
-| Agent handoff chat room (13 scripted messages) | `handoff.tsx` | ✅ Exceptional |
-| Handoff dividers + flag badges + typing indicator | `handoff.tsx` | ✅ Polished |
-| Aura Score animated count-up (0→712) | `report.tsx` | ✅ Polished |
-| INVEST verdict stamp with spring physics | `report.tsx` | ✅ Exceptional |
-| Dimension scores (4 bar charts) | `report.tsx` | ✅ Polished |
-| Key metrics (2×2 grid) | `report.tsx` | ✅ Polished |
-| Expandable agent report cards (2 of 4) | `report.tsx` | 🟡 Partial |
-| Deliverables accordion (3 items) | `report.tsx` | ✅ Polished |
-| Screen-to-screen navigation (full flow) | All | ✅ Functional |
-| Dark theme consistency | All | ✅ Polished |
-| Skip button on loading + handoff | loading/handoff | ✅ Functional |
-
-**Demo flow**: Splash → Home → Search → Loading (4 agent scenes) → Handoff (chat) → Report (score reveal). Total runtime: ~25 seconds end-to-end.
+> The 2026-05-17 trace called VibeInvest "a visually exceptional demo shell —
+> 0% connected to the backend." That is no longer true. It is now an
+> **end-to-end functional product**: a real FastAPI backend with a 4-agent
+> pipeline, user auth, server-side PDF, and PostgreSQL persistence, **deployed
+> to Railway** and wired to the Expo app. Remaining work is hardening, native
+> session persistence, and test coverage.
 
 ---
 
-## What's Missing (Functional Gaps)
+## What Works
 
-### P0 — Required for real functionality
+| Capability | Where | Status |
+|------------|-------|--------|
+| Custom GIF splash + dark theme | `_layout.tsx` | ✅ Polished |
+| Home / dashboard with live recent analyses | `index.tsx` | ✅ Functional |
+| Search + intent + pitch-deck (PDF) upload | `search.tsx` | ✅ Functional |
+| Real analysis pipeline — `POST /api/analyses` + poll | `api.ts`, backend | ✅ Functional |
+| 4-agent backend (Skeptic / Munshi / Hype / CVO) | `backend/app/agents/` | ✅ Functional |
+| Aura Score scoring (/1000) + verdict | `backend/app/scoring.py` | ✅ Functional |
+| Loading screen driven by real poll progress | `loading.tsx` | ✅ Polished |
+| Agent handoff chat room | `handoff.tsx` | ✅ Polished |
+| Report bound to live `ReportData` | `report.tsx` | ✅ Functional |
+| Server-side ReportLab PDF + download / share | `pdf_generator.py`, `report.tsx` | ✅ Functional |
+| Auth — signup / signin / Google | `auth.tsx`, backend `auth.py` | ✅ Functional |
+| Per-user data scoping + ownership checks | `routes/analyses.py` | ✅ Functional |
+| Glassmorphic toast notifications | `ToastContext.tsx` | ✅ Polished |
+| Web session persistence | `AuthContext.tsx` | ✅ Functional |
+| PostgreSQL persistence | `backend/app/db.py` | ✅ Functional |
+| Railway deployment (public HTTPS) | `DEPLOY.md`, Railway | ✅ Live |
+| EAS / APK build config | `eas.json` | ✅ Configured |
+| Native session persistence | `AuthContext.tsx` | ⬜ Missing |
+| Automated tests | — | ⬜ Missing |
 
-| Gap | Impact | Effort |
-|-----|--------|--------|
-| SSE streaming service (`services/api.ts`) | Cannot connect to backend | High |
-| SSE library (`react-native-sse` or fetch parser) | No EventSource in RN | Medium |
-| Replace loading timer with real SSE events | Loading is fake | High |
-| Parse `pipeline_complete` → `ReportData` types | Report is hardcoded | Medium |
-| Dynamic report data binding | Every startup shows same data | Medium |
-
-### P1 — Required for production quality
-
-| Gap | Impact | Effort |
-|-----|--------|--------|
-| Wire intent + context fields to API | Extra inputs are wasted | Low |
-| Add Hype + CVO agent report cards | Only 2 of 4 agents shown | Low |
-| Error states (network, timeout, API error) | App crashes silently on failure | Medium |
-| Loading/skeleton states | No feedback during data fetch | Low |
-| Empty state for recent reports | Hardcoded list | Low |
-| `KeyboardAvoidingView` on search | Inputs hidden on small devices | Low |
-
-### P2 — Nice to have
-
-| Gap | Impact | Effort |
-|-----|--------|--------|
-| Download/Share button handlers | Buttons do nothing | Medium |
-| Local report caching (AsyncStorage) | Can't view past reports | Medium |
-| TypeScript cleanup (remove `any`) | Code quality | Low |
-| Component extraction to `components/` | Maintainability | Medium |
-| Accessibility labels | Accessibility compliance | Low |
-| Tests (score calc, SSE parser) | No test coverage | Medium |
+**Live backend**: `https://vibeinvest-backend-production.up.railway.app` — `/health` 200, auth + DB verified.
 
 ---
 
@@ -72,14 +50,17 @@
 | Aspect | Grade | Notes |
 |--------|-------|-------|
 | Visual design | A+ | Exceptional dark theme, animations, agent personality |
-| Navigation | A | Clean linear flow, proper use of replace vs push |
-| Code organization | C | Monolithic screens, no component extraction, no services layer |
-| Type safety | C- | `any` types on component props, no data model types |
-| API integration | F | Zero network calls, no service layer |
-| Error handling | F | No error states, no try/catch, no offline detection |
-| Testing | F | No test files exist |
-| Accessibility | D | Touch targets are sized correctly but no labels |
-| Security | D | API keys committed to git |
+| Navigation | A | 10-screen flow with auth gates, clean `replace`/`push` use |
+| Backend & API | A− | Real pipeline, deployed; poll-based; hardening pending |
+| Deployment | A− | Railway + managed Postgres; EAS profiles set |
+| Error handling | B | Toast system + poll fail-safes; backend `detail` surfaced |
+| Type safety | B− | `services/types.ts` mirrors `schemas.py`; some `any` remain |
+| Auth & security | B− | Real auth works; CORS `*`, `SECRET_KEY` stability to fix |
+| Code organization | C | Monolithic screens (`index.tsx` 1905 lines); no extraction |
+| Accessibility | D | Touch targets sized; `accessibilityLabel`s still missing |
+| Testing | F | No test runner, no tests |
+
+Net trajectory since 05-17: **API integration F → A−**, **error handling F → B**, **type safety C− → B−**. Code organization slipped (**C → C**, trending down) as screens grew without extraction.
 
 ---
 
@@ -87,40 +68,40 @@
 
 | File | Lines | Assessment |
 |------|-------|------------|
-| `app/loading.tsx` | 728 | ⚠️ Should be split: 4 scene components → `components/scenes/` |
-| `app/report.tsx` | 376 | ⚠️ Should extract: DimItem, MetricCard, AgentCard → `components/` |
-| `app/handoff.tsx` | 369 | Acceptable — single-purpose screen |
-| `app/index.tsx` | 162 | ✅ Good size |
-| `app/search.tsx` | 148 | ✅ Good size |
-| `app/_layout.tsx` | 97 | ✅ Good size |
+| `app/index.tsx` | 1905 | 🔴 Split — dashboard, trending, gates → `components/` + a hook |
+| `app/report.tsx` | 1194 | 🔴 Extract DimItem / MetricCard / AgentCard / PDF view |
+| `app/loading.tsx` | 781 | ⚠️ Extract the 4 scenes → `components/scenes/` |
+| `app/auth.tsx` | 644 | ⚠️ Large but single-purpose |
+| `app/profile.tsx` | 479 | Acceptable |
+| `app/handoff.tsx` | 448 | Acceptable |
+| `app/search.tsx` | 410 | ✅ Good |
+| `app/how-they-work.tsx` | 359 | ✅ Good |
+| `app/reports.tsx` | 317 | ✅ Good |
+| `app/_layout.tsx` | 109 | ✅ Good |
 
 ---
 
-## Recommended Next Actions (Priority Order)
+## Recommended Next Actions (priority order)
 
-### Immediate (before next demo)
-1. **Add `.env` to `.gitignore`** and rotate API keys
-2. **Delete `frontend/` directory** — dead code
-3. **Add Hype + CVO agent cards** to report screen (copy Skeptic/Munshi pattern)
+### Immediate (before sharing the deployment)
+1. Confirm `CLAUDE_API_KEY` / `GOOGLE_API_KEY` / `TAVILY_API_KEY` are set as **Railway** variables — the pipeline fails server-side without them (ERR-001).
+2. Set a stable `SECRET_KEY` Railway variable so tokens survive redeploys (ERR-002).
+3. Narrow CORS `allow_origins` from `["*"]` to the real frontend domain(s) (ERR-003).
 
-### Short-term (connect to backend)
-4. **Install SSE library**: `yarn add react-native-sse` (or build manual fetch stream)
-5. **Create `services/api.ts`**: `startAnalysis(query: StartupQuery)` → SSE stream
-6. **Define TypeScript types**: `StartupQuery`, `AgentStatus`, `ReportData`, `AgentReport` per PRD
-7. **Replace timer in loading.tsx** with SSE event listener
-8. **Parse `pipeline_complete` payload** and pass to report screen
-9. **Wire search form fields** to API request body
+### Short-term (product completeness)
+4. Install `@react-native-async-storage/async-storage` and persist the session on native (ERR-006).
+5. Wire up Alembic migrations — `create_all` is add-only (ERR-004).
+6. Update `README.md` / `ROADMAP.md` / `FEATURES.md` / `PHASES.md` to the shipped Expo + FastAPI architecture (ERR-013).
 
-### Medium-term (production quality)
-10. **Add error handling** with user-visible error states
-11. **Add `KeyboardAvoidingView`** to search screen
-12. **Extract components** from loading.tsx and report.tsx
-13. **Remove `any` types** — define proper prop interfaces
-14. **Add accessibility labels** to all icon buttons
-15. **Write tests** for score calculation and SSE parsing
+### Medium-term (quality)
+7. Extract components from `index.tsx` / `report.tsx` / `loading.tsx` (ERR-007).
+8. Replace remaining `any` prop types with interfaces from `services/types.ts` (ERR-008).
+9. Add a test runner and cover `scoring.py`, `services/api.ts`, the auth flow (ERR-010).
+10. Add `accessibilityLabel`s to icon-only buttons (ERR-009).
+11. Fix the `vibeinevst-logo.gif` filename typo; delete the empty `google-adk-agent/` (ERR-011, ERR-012).
 
 ---
 
 ## Summary
 
-> **VibeInvest is a visually exceptional demo shell — 90% complete on UI, 0% connected to the backend.** The loading animations, handoff chat, and score reveal create a compelling 25-second demo flow. The critical path to a functional product is: SSE library → service layer → event parsing → dynamic data binding.
+VibeInvest has gone from a UI prototype to a deployed, full-stack product in the four days since the last trace: a FastAPI 4-agent backend on Railway, PostgreSQL persistence, real auth, server-side PDF, and a polished Expo client wired to all of it. The critical path to launch is now **operational hardening** — Railway env vars, a stable signing key, and tightened CORS — not feature work. The largest standing engineering debt is screen-file size and the complete absence of tests.

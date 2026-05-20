@@ -12,11 +12,11 @@ description: "Use this skill to log any completed Antigravity task. Triggers: 'l
    mkdir -p .agents/traces/logs
    ```
 
-2. **Get the next ID** by counting existing log files:
+2. **Get the next ID** by finding the highest existing log ID (do **not** count files — a gap or duplicate throws the count off):
    ```bash
-   ls .agents/traces/logs/ | grep "^log-" | wc -l
+   ls .agents/traces/logs/ 2>/dev/null | grep -oE '^log-[0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1
    ```
-   Add 1 → zero-pad to 3 digits → e.g. `001`, `002`, `003`
+   Add 1 → zero-pad to 3 digits → e.g. `001`, `002`, `003`. If no logs exist yet, start at `001`.
 
 3. **Create the file** as `log-<id>-<kebab-case-task-name>.md`
 

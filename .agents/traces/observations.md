@@ -1,7 +1,8 @@
 # Agent Observations — Codebase Architecture
 
-> **Trace ID**: `892ab532-e0ea-41be-80ee-7dfb0abfa3b5`
-> **Generated**: 2026-05-17T16:45:00+05:00
+> **Trace ID**: `f3d9c2e1-8a47-4b6e-bf52-1c9e0d4a7b38`
+> **Generated**: 2026-05-21
+> **Supersedes**: trace `892ab532-e0ea-41be-80ee-7dfb0abfa3b5` (2026-05-17)
 
 ---
 
@@ -9,59 +10,101 @@
 
 ```
 VibeInvest/
-├── .agents/specs/          PRD.md, PLAN.md
-├── .agents/skills/         5 skill templates (add-screen, add-component, etc.)
-├── app/                    6 screens (Expo Router file-based routing)
-│   ├── _layout.tsx         Root layout — Stack nav + custom splash
-│   ├── index.tsx           Home/splash screen (162 lines)
-│   ├── search.tsx          Search form (148 lines)
-│   ├── loading.tsx         Agent animations (728 lines — LARGEST file)
-│   ├── handoff.tsx         Agent chat room (369 lines — NOT in PRD)
-│   └── report.tsx          Final report (376 lines)
-├── components/             Expo scaffold defaults only (no project components)
+├── .agents/specs/          PRD.md, PLAN.md, BACKEND-PLAN.md
+├── .agents/skills/         6 skill templates (add-screen, add-component,
+│                           add-api-call, write-test, debug-platform-issue,
+│                           create-task-log)
+├── .agents/traces/         this trace (8 summary files) + logs/ (15 task logs)
+├── app/                    10 screens (Expo Router file-based routing)
+│   ├── _layout.tsx         Root — Auth/Reports/Toast providers + Stack + splash (109)
+│   ├── index.tsx           Home / dashboard / trending picks (1905 — LARGEST)
+│   ├── auth.tsx            Signup / signin / Google (644)
+│   ├── search.tsx          Search form + pitch-deck upload (410)
+│   ├── loading.tsx         4 agent scenes + real poll loop (781)
+│   ├── handoff.tsx         Agent chat room (448 — not in PRD)
+│   ├── report.tsx          Report + PDF + share (1194)
+│   ├── how-they-work.tsx   Agent explainer screen (359)
+│   ├── profile.tsx         Profile / password settings (479)
+│   └── reports.tsx         Report history (317)
+├── backend/                FastAPI app — REAL, deployed to Railway
+│   ├── app/                23 Python modules (see Backend section)
+│   ├── DEPLOY.md           Canonical Railway deployment guide
+│   ├── Procfile            uvicorn app.main:app --host 0.0.0.0 --port $PORT
+│   ├── requirements.txt    FastAPI, SQLAlchemy, anthropic, reportlab, psycopg2…
+│   ├── run.sh              Local dev runner
+│   └── data.db*            Local SQLite dev DB + WAL sidecars (gitignored)
+├── context/                AuthContext.tsx, ReportsContext.tsx, ToastContext.tsx
+├── services/               api.ts (API client), types.ts (schema mirror)
+├── components/             Expo scaffold defaults — still unused by screens
 ├── constants/theme.ts      Colors + platform-adaptive Fonts
-├── hooks/                  Expo defaults only (useColorScheme, useThemeColor)
-├── google-adk-agent/       Backend agent config (.env only)
-├── api/env/                Python venv (stale)
-├── frontend/               Abandoned Next.js app (.next + node_modules only)
-├── .temp/                  Prototype JSX/HTML files from ideation phase
-└── assets/images/          12 image files including brand logo + GIF
+├── hooks/                  Expo defaults only
+├── google-adk-agent/       EMPTY (gitignored) — planned ADK agent never built
+├── assets/images/          Brand logo + splash GIF + icons
+├── eas.json                EAS build profiles (API base URL per profile)
+├── app.json                Expo config
+├── .env                    Real LLM keys — gitignored, never committed
+└── dist/                   Web build output (gitignored)
 ```
+
+---
 
 ## Key Architectural Observations
 
-### 1. No service layer exists
-The PRD and skill files prescribe a `services/api.ts` pattern for API calls. No `services/` directory was ever created. All data in the app is hardcoded inline within screen files. The app has zero network calls.
+### 1. The service layer now exists
+`services/api.ts` (231 lines) is a typed `fetch` client; `services/types.ts` mirrors `backend/app/schemas.py`. The 2026-05-17 trace reported "no `services/` directory" — that is no longer true. All screens now call the real API.
 
-### 2. Flat screen architecture (correct)
-All 6 screens live directly in `app/` with no nested routes, groups, or tab navigation. This matches the PRD's linear flow (Home → Search → Loading → Report). The Stack navigator in `_layout.tsx` has `headerShown: false` — all headers are custom.
+### 2. There is a real, deployed backend
+`backend/` is a FastAPI application running on Railway against a Railway-managed PostgreSQL database (`https://vibeinvest-backend-production.up.railway.app`). The 4-agent pipeline, Aura Score scoring, auth, and PDF generation all run server-side.
 
-### 3. Monolithic screen files
-Screens contain their own inline sub-components and styles. `loading.tsx` (728 lines) includes 4 scene components, a PulsingDot utility, the main screen, scene styles, and main styles — all in one file. `report.tsx` (376 lines) defines DimItem, MetricCard, and AgentCard inline. No component extraction to `components/` occurred.
+### 3. The pipeline is poll-based, not SSE
+The PRD specified an SSE stream (`POST /api/run/google-adk`). The implementation instead uses request/poll: `createAnalysis()` POSTs to `/api/analyses`, then `pollAnalysis()` polls `GET /api/analyses/{id}` every 2 s (240 s timeout) until `status` is `completed`/`failed`. No `EventSource`, no SSE library — a deliberate, simpler choice for React Native.
 
-### 4. Components directory is untouched scaffold
-`components/` contains only Expo's auto-generated defaults:
-- `external-link.tsx`, `haptic-tab.tsx`, `hello-wave.tsx`, `parallax-scroll-view.tsx`, `themed-text.tsx`, `themed-view.tsx`, `ui/collapsible.tsx`, `ui/icon-symbol.tsx`
+### 4. Global state via three React contexts
+`_layout.tsx` nests `AuthProvider → ReportsProvider → ToastProvider` around the Stack. No Redux/Zustand — plain Context API.
 
-None of these are used by any screen in the app.
+### 5. Screens are still monolithic
+`index.tsx` is now **1905 lines**, `report.tsx` **1194**, `loading.tsx` **781**. Sub-components (scenes, cards, bubbles) remain inline. No extraction to `components/` has occurred — this is the largest outstanding code-quality debt.
 
-### 5. Hooks directory is untouched scaffold
-`hooks/` contains `use-color-scheme.ts` and `use-theme-color.ts` — both Expo defaults. No custom hooks for SSE, form state, or report data were created.
+### 6. `components/` and `hooks/` are still untouched scaffold
+Both directories hold only Expo's auto-generated defaults. None are imported by any app screen. Custom logic lives in `context/` and `services/` instead.
 
-### 6. Handoff screen is a bonus addition
-`handoff.tsx` doesn't appear in the PRD navigation map. It was inserted between Loading and Report as a dramatic narrative device — a chat room where agents discuss findings before the score reveal.
+### 7. Backend rolls its own auth crypto
+`backend/app/auth.py` implements PBKDF2-SHA256 password hashing and HMAC-SHA256 signed tokens using only Python's standard library (`hashlib`, `hmac`, `secrets`) — no `passlib`, no `pyjwt`. Tokens are JWT-style but custom.
 
-### 7. Two icon systems in use
-The app uses both `@expo/vector-icons` (Ionicons) and `lucide-react-native`. Ionicons handles nav elements (back arrows, chevrons, action buttons). Lucide handles agent-specific icons (Search, CircleDollarSign, Sparkles, Crown, Bike, FileText).
+### 8. The planned web/ADK stack was abandoned
+`frontend/` (Next.js), `.temp/` (prototypes), and `api/` (Python venv) — all present in the 2026-05-17 trace — have been **deleted**. `google-adk-agent/` is now empty. `frontend/` and `google-adk-agent/` are gitignored. The README's "Next.js 15 + Google ADK" architecture never materialized; the real stack is Expo + FastAPI.
 
-### 8. Reanimated installed but barely used
-`react-native-reanimated@4.1.1` is a dependency but is only used by scaffold components (`parallax-scroll-view.tsx`, `hello-wave.tsx`). All custom animations use React Native's built-in `Animated` API.
+### 9. Pitch-deck upload is supported
+`search.tsx` uses `expo-document-picker`; `createAnalysis()` sends the file as multipart form-data; `backend/app/pdf_parser.py` (pypdf) extracts deck text for the agents.
 
-### 9. Frontend directory is a dead artifact
-`frontend/` contains `.next/` and `node_modules/` — remnants of an abandoned Next.js web app. No source files remain. The README still references it.
+### 10. Two icon systems, Reanimated still idle
+`@expo/vector-icons` (Ionicons) handles UI chrome; `lucide-react-native` handles agent iconography. `react-native-reanimated@4.1.1` is installed but custom animations still use RN's built-in `Animated` API.
 
-### 10. `.temp/` contains prototype files
-`.temp/` has 10 JSX/HTML prototype files (`agent-loading.jsx`, `screens-flow.jsx`, `screens-result.jsx`, `tweaks-panel.jsx`, etc.) plus a CSS file. These were likely used for rapid UI prototyping before the React Native implementation.
+### 11. Session persistence is web-only
+The auth session persists across reloads on web via `localStorage` (`vibe.auth.session`). On native iOS/Android a cold start still loses the session — `@react-native-async-storage/async-storage` is not installed. Known, documented gap (log-012).
+
+### 12. Secrets handling
+`.env` holds real `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `CLAUDE_API_KEY`, `TAVILY_API_KEY` in plaintext. It **is** in `.gitignore` and `git log` shows it was **never committed**. The non-secret `EXPO_PUBLIC_API_BASE_URL` is committed in `eas.json` (safe — public endpoint).
+
+---
+
+## Backend Module Map (`backend/app/`)
+
+| Module | Responsibility |
+|--------|----------------|
+| `main.py` | FastAPI app, CORS (`allow_origins=["*"]`), `/health`, startup `init_db()` |
+| `config.py` | Env resolution, `_resolve_database_url()` (DATABASE_URL/POSTGRES_URL) |
+| `db.py` | SQLAlchemy engine, `IS_SQLITE` gate, `pool_pre_ping`, `init_db()` |
+| `models.py` | ORM tables — `users`, `analyses`, `agent_runs`, `raw_evidence` |
+| `schemas.py` | Pydantic request/response models (mirrored by `services/types.ts`) |
+| `auth.py` | PBKDF2-SHA256 hashing + HMAC-SHA256 token signing (std lib only) |
+| `orchestrator.py` | Runs the 4-agent pipeline |
+| `scoring.py` | Aura Score computation → score /1000 + verdict |
+| `pdf_generator.py` | ReportLab investor-grade PDF |
+| `pdf_parser.py` | pypdf — extracts text from uploaded pitch decks |
+| `agents/` | `base.py`, `skeptic.py`, `munshi.py`, `hype.py`, `cvo.py`, `tools.py` |
+| `routes/` | `auth.py`, `analyses.py` |
+| `services/` | `auth.py`, `deps.py` (`get_current_user`), `google_auth.py` |
 
 ---
 
@@ -72,57 +115,41 @@ The app uses both `@expo/vector-icons` (Ionicons) and `lucide-react-native`. Ion
 | Background | `#09090F` | All screen containers |
 | Primary accent | `#6366f1` | Buttons, links, score highlight |
 | Primary light | `#818cf8` | Subtle accent text |
-| Skeptic color | `#FF6B6B` | Red — risk, warnings |
-| Munshi color | `#D4FF3D` | Lime — financial data |
-| Hype color | `#A78BFA` | Purple — brand, social |
-| CVO color | `#FFC83C` | Gold — final verdict |
+| Skeptic | `#FF6B6B` | Red — risk, warnings |
+| Munshi | `#D4FF3D` | Lime — financial data |
+| Hype | `#A78BFA` | Purple — brand, social |
+| CVO | `#FFC83C` | Gold — final verdict |
 | Success | `#22c55e` | Positive metrics, INVEST stamp |
 | Warning | `#f59e0b` | Watch indicators |
-| Danger | `#ef4444` | Risk flags |
-| Card bg | `rgba(255,255,255,0.04-0.06)` | Glassmorphic cards |
-| Card border | `rgba(255,255,255,0.08-0.15)` | Subtle glass edges |
-| Border width | `0.5px` | Consistent thin borders |
-| Border radius | `10-16px` (cards), `50px` (buttons) | Rounded cards, pill buttons |
-| Mono font | Platform-adaptive via `Fonts.mono` | Terminal text, badges, timestamps |
+| Danger | `#ef4444` | Risk flags, REJECTED stamp |
+| Card bg | `rgba(255,255,255,0.04–0.06)` | Glassmorphic cards |
+| Toast | `BlurView` + glow overlay | Glassmorphic notifications, notch-safe |
+
+Finding colors are centralized in `services/types.ts:findingColor()`.
 
 ---
 
 ## Dependency Analysis
 
+### Added since the 2026-05-17 trace
+`expo-blur` (toast glass), `expo-document-picker` (deck upload), `expo-print` + `expo-sharing` (PDF), `expo-linear-gradient`, `expo-linking`, `expo-system-ui`, `react-native-gesture-handler`, `react-native-worklets`.
+
 ### Used in app code
-| Package | Where |
-|---------|-------|
-| `expo-router` | All screens — `useRouter`, `useLocalSearchParams`, `Stack` |
-| `react-native` (Animated) | loading.tsx, handoff.tsx, report.tsx, _layout.tsx |
-| `@expo/vector-icons` (Ionicons) | search.tsx, report.tsx — nav icons, action buttons |
-| `lucide-react-native` | loading.tsx, handoff.tsx, report.tsx — agent icons |
-| `expo-splash-screen` | _layout.tsx — `preventAutoHideAsync`, `hideAsync` |
-| `expo-status-bar` | _layout.tsx — `StatusBar style="light"` |
-| `react-native-safe-area-context` | Implicit via SafeAreaView |
+`expo-router`, `react-native` (`Animated`), `@expo/vector-icons`, `lucide-react-native`, `expo-splash-screen`, `expo-blur`, `expo-document-picker`, `expo-print`, `expo-sharing`, `react-native-safe-area-context`.
 
 ### Installed but unused by app screens
-| Package | Notes |
-|---------|-------|
-| `react-native-reanimated` | Only used in scaffold components |
-| `expo-haptics` | Only in scaffold `haptic-tab.tsx` |
-| `expo-web-browser` | Only in scaffold `external-link.tsx` |
-| `expo-image` | Not imported anywhere |
-| `expo-font` | Not imported anywhere |
-| `expo-constants` | Not imported anywhere |
-| `expo-symbols` | Not imported anywhere |
-| `@react-navigation/bottom-tabs` | Not used (no tab navigation) |
+`react-native-reanimated` (scaffold only), `expo-haptics` (scaffold tab only), `expo-web-browser` (used for PDF on native + scaffold), `expo-image`, `expo-font`, `expo-constants`, `expo-symbols`, `@react-navigation/bottom-tabs` (no tab nav).
 
 ---
 
-## Git Branch Topology
+## Git Topology
 
 ```
-main (8e3f41e)  ← HEAD, 16 commits, linear history
-├── update-docs (8e3f41e)  ← current branch, same as main
-├── logo-addition (c59a96b)  ← merged into main
-├── mob_app (129abb3)  ← stale, 4 commits diverged from 985c751
-├── UI-Phase1 (80e6e16)  ← stale, 1 commit diverged from d032b78
-└── kill-switch (55f50f7)  ← stale, 1 commit diverged from d032b78
+main (441ebbc)  ← HEAD — "remove skip, add backend url"
+3 merged PRs:  #1 update-docs · #2 user-api · #3 user-api
+Local branches: main, backend-setup, mob_app, ui-changes, update-docs
+Remote-only:    UI-Phase1, backend, kill-switch, logo-addition,
+                merge-updated-ui, postgres-setup
 ```
 
-3 stale branches with unmerged work.
+History is no longer linear — backend, UI, and auth work proceeded on parallel branches and were merged. Several stale branches remain unmerged.
