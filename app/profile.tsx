@@ -155,7 +155,7 @@ function PrimaryCTA({
 // ─── main screen ────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, changePassword, isLoading } = useAuth();
 
   // Name section
   const [name, setName] = useState(user?.name ?? '');
@@ -174,17 +174,21 @@ export default function ProfileScreen() {
   const canSubmitPassword =
     canEditPasswordFields && newPw.length >= 6 && passwordsMatch;
 
-  const handleSaveName = () => {
+  const handleSaveName = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
       Alert.alert('Name required', 'Please enter your name.');
       return;
     }
-    updateProfile({ name: trimmed });
-    Alert.alert('Saved', 'Your name has been updated.');
+    try {
+      await updateProfile({ name: trimmed });
+      Alert.alert('Saved', 'Your name has been updated.');
+    } catch (err: any) {
+      Alert.alert('Update failed', err?.message ?? 'Could not update your name.');
+    }
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!currentPw.trim()) {
       Alert.alert('Current password required', 'Enter your current password to continue.');
       return;
@@ -197,13 +201,15 @@ export default function ProfileScreen() {
       Alert.alert('Passwords do not match', 'New and confirm passwords must match.');
       return;
     }
-    // TODO: wire to a real change-password endpoint when the backend supports
-    // it. AuthContext exposes signIn/signUp/signOut/updateProfile today, so
-    // the password mutation has nowhere to land yet.
-    setCurrentPw('');
-    setNewPw('');
-    setConfirmPw('');
-    Alert.alert('Password updated', 'Your password has been changed.');
+    try {
+      await changePassword(currentPw, newPw);
+      setCurrentPw('');
+      setNewPw('');
+      setConfirmPw('');
+      Alert.alert('Password updated', 'Your password has been changed.');
+    } catch (err: any) {
+      Alert.alert('Update failed', err?.message ?? 'Could not change your password.');
+    }
   };
 
   const renderEye = (visible: boolean, toggle: () => void) => (
@@ -261,7 +267,7 @@ export default function ProfileScreen() {
                     label="Save Changes"
                     icon="checkmark-outline"
                     onPress={handleSaveName}
-                    disabled={!nameChanged}
+                    disabled={!nameChanged || isLoading}
                   />
                 </View>
               </LinearGradient>
@@ -340,7 +346,7 @@ export default function ProfileScreen() {
                     label="Update Password"
                     icon="shield-checkmark-outline"
                     onPress={handleChangePassword}
-                    disabled={!canSubmitPassword}
+                    disabled={!canSubmitPassword || isLoading}
                   />
                 </View>
               </LinearGradient>
