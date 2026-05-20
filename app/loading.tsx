@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View
 } from 'react-native';
 import { Fonts } from '../constants/theme';
@@ -617,9 +616,6 @@ export default function LoadingScreen() {
       {/* Bottom bar */}
       <View style={styles.bottomBar}>
         <Text style={styles.hintText}>{'>'} 4 agents · ~12s irl</Text>
-        <TouchableOpacity onPress={handleSkip} style={styles.skipBtn}>
-          <Text style={styles.skipText}>skip →</Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -782,10 +778,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 20,
   },
   hintText: { fontFamily: Fonts.mono, fontSize: 11, color: 'rgba(255,255,255,0.25)' },
-  skipBtn: {
-    paddingVertical: 6, paddingHorizontal: 14,
-    borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
-  },
-  skipText: { fontSize: 12, color: 'rgba(255,255,255,0.5)' },
 });
