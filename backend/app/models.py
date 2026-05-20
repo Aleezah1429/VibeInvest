@@ -32,7 +32,6 @@ class Analysis(Base):
 
     agent_runs: Mapped[list["AgentRun"]] = relationship(back_populates="analysis", cascade="all, delete-orphan")
     evidence: Mapped[list["RawEvidence"]] = relationship(back_populates="analysis", cascade="all, delete-orphan")
-    events: Mapped[list["Event"]] = relationship(back_populates="analysis", cascade="all, delete-orphan")
 
 
 class AgentRun(Base):
@@ -64,15 +63,3 @@ class RawEvidence(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     analysis: Mapped["Analysis"] = relationship(back_populates="evidence")
-
-
-class Event(Base):
-    __tablename__ = "events"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    analysis_id: Mapped[str] = mapped_column(ForeignKey("analyses.id"), nullable=False)
-    type: Mapped[str] = mapped_column(String, nullable=False)
-    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
-
-    analysis: Mapped["Analysis"] = relationship(back_populates="events")

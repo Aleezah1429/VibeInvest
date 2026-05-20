@@ -3,15 +3,27 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import DATABASE_URL
 
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args, future=True)
+IS_SQLITE = DATABASE_URL.startswith("sqlite")
+
+connect_args = {"check_same_thread": False} if IS_SQLITE else {}
+engine_kwargs = {"future": True, "connect_args": connect_args}
+
+if not IS_SQLITE:
+    # Managed Postgres (Railway/Supabase/etc.) closes idle TCP connections.
+    # pool_pre_ping does a cheap SELECT 1 on checkout so we drop dead sockets
+    # instead of returning a 500. pool_recycle keeps connections under most
+    # provider idle-timeouts (Railway = 5 min by default).
+    engine_kwargs["pool_pre_ping"] = True
+    engine_kwargs["pool_recycle"] = 280
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 # SQLite is single-writer. Without WAL and a busy timeout, a long-running
 # background task (e.g. the agent pipeline) will lock the file and any
 # concurrent request errors with "database is locked". WAL lets reads run
 # alongside the writer; busy_timeout makes new writers wait briefly instead
 # of failing.
-if DATABASE_URL.startswith("sqlite"):
+if IS_SQLITE:
     @event.listens_for(engine, "connect")
     def _sqlite_pragmas(dbapi_conn, _record):
         cursor = dbapi_conn.cursor()
@@ -39,7 +51,11 @@ def init_db():
     from . import models  # noqa: F401  ensure models are imported
     from . import auth  # noqa: F401  ensure auth models are imported
     Base.metadata.create_all(bind=engine)
-    _ensure_analyses_user_id()
+    # The ALTER-TABLE migration below is only meaningful for legacy sqlite
+    # files that predate the user_id column. On Postgres (or any fresh DB)
+    # create_all already produces the right schema.
+    if IS_SQLITE:
+        _ensure_analyses_user_id()
 
 
 def _ensure_analyses_user_id():
