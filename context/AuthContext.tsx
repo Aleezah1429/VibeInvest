@@ -8,6 +8,7 @@ import {
   apiUpdateName,
   apiChangePassword,
   setUnauthorizedHandler,
+  setAuthToken,
 } from '../services/api';
 
 export interface User {
@@ -83,8 +84,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // If any API call returns 401 (token expired / revoked), force sign-out so
   // the gates in /index.tsx and /search.tsx redirect to /auth on the next render.
   useEffect(() => {
+    // Seed the request-layer token from any persisted web session.
+    const persisted = loadSession();
+    if (persisted?.token) setAuthToken(persisted.token);
+
     setUnauthorizedHandler(() => {
       saveSession(null);
+      setAuthToken(null);
       setIsAuthenticated(false);
       setUser(null);
     });
@@ -143,6 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await apiSignIn(email, password);
       const nextUser = { name: res.user.name, email: res.user.email };
       saveSession({ user: nextUser, token: res.access_token });
+      setAuthToken(res.access_token);
       setIsAuthenticated(true);
       setUser(nextUser);
       setIsLoading(false);
@@ -162,6 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await apiSignUp(name, email, password);
       const nextUser = { name: res.user.name, email: res.user.email };
       saveSession({ user: nextUser, token: res.access_token });
+      setAuthToken(res.access_token);
       setIsAuthenticated(true);
       setUser(nextUser);
       setIsLoading(false);
@@ -189,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const nextUser = { name: res.user.name, email: res.user.email };
       saveSession({ user: nextUser, token: res.access_token });
+      setAuthToken(res.access_token);
       setIsAuthenticated(true);
       setUser(nextUser);
       setIsLoading(false);
@@ -203,6 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await triggerHaptic('light');
     saveSession(null);
+    setAuthToken(null);
     setIsAuthenticated(false);
     setUser(null);
   };

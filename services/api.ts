@@ -18,7 +18,17 @@ export const API_BASE_URL =
 // circular import (AuthContext imports from this file).
 const AUTH_STORAGE_KEY = 'vibe.auth.session';
 
+// In-memory token. Native (real device / APK) has no localStorage, so
+// AuthContext pushes the token here after sign-in via setAuthToken(). Without
+// it every authed request 401s and the 401 handler bounces the user to /auth.
+let inMemoryToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  inMemoryToken = token;
+}
+
 function readAuthToken(): string | null {
+  if (inMemoryToken) return inMemoryToken;
   if (Platform.OS !== 'web') return null;
   const ls = (globalThis as any)?.localStorage;
   if (!ls) return null;
