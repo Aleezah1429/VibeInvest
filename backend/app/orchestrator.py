@@ -5,7 +5,7 @@ from datetime import datetime
 
 from .db import SessionLocal
 from .models import Analysis
-from .scoring import aura_score
+from .scoring import aura_score, verdict_from_score
 from .agents import cvo, hype, munshi, skeptic
 
 log = logging.getLogger("orchestrator")
@@ -41,13 +41,19 @@ def run_pipeline(analysis_id: str) -> None:
             cvo_out["strategy_score"],
         )
 
+        # Verdict is driven by the Aura Score (INVEST at 500+), not the LLM.
+        verdict = verdict_from_score(score, a.intent, cvo_out["verdict"])
+        # Keep the CVO's qualifier only when its verdict still stands — a
+        # mismatched sub ("REJECT · STRONG CONVICTION") would read as a bug.
+        verdict_sub = cvo_out["verdict_sub"] if verdict == cvo_out["verdict"] else ""
+
         report = {
             "startup_name": a.startup_name,
             "intent": a.intent,
             "tags": skeptic_out.get("tags", []),
             "score": score,
-            "verdict": cvo_out["verdict"],
-            "verdict_sub": cvo_out["verdict_sub"],
+            "verdict": verdict,
+            "verdict_sub": verdict_sub,
             "dimensions": [
                 {"name": "Market fit", "score": skeptic_out["market_fit_score"]},
                 {"name": "Financials", "score": munshi_out["financials_score"]},
@@ -64,13 +70,13 @@ def run_pipeline(analysis_id: str) -> None:
         }
 
         a.score = score
-        a.verdict = cvo_out["verdict"]
-        a.verdict_sub = cvo_out["verdict_sub"]
+        a.verdict = verdict
+        a.verdict_sub = verdict_sub
         a.report_json = json.dumps(report)
         a.status = "completed"
         a.completed_at = datetime.utcnow()
         db.commit()
-        log.info("pipeline complete for %s: score=%d verdict=%s", a.startup_name, score, cvo_out["verdict"])
+        log.info("pipeline complete for %s: score=%d verdict=%s", a.startup_name, score, verdict)
     except Exception as e:
         log.exception("run_pipeline failed")
         a = db.get(Analysis, analysis_id)
