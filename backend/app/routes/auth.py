@@ -3,13 +3,23 @@ from sqlalchemy.orm import Session
 
 from ..db import get_session
 from ..auth import (
+    User,
     UserSignUp,
     UserSignIn,
     GoogleAuthRequest,
     TokenResponse,
     UserResponse,
+    UpdateUsernameRequest,
+    ChangePasswordRequest,
 )
-from ..services.auth import signup_user, login_user, create_access_token
+from ..services.auth import (
+    signup_user,
+    login_user,
+    create_access_token,
+    update_username,
+    change_password,
+)
+from ..services.deps import get_current_user
 from ..services.google_auth import authenticate_google_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -54,6 +64,34 @@ def signin(credentials: UserSignIn, db: Session = Depends(get_session)):
         token_type="bearer",
         user=_to_user_response(user)
     )
+
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    """Return the authenticated user's profile."""
+    return _to_user_response(current_user)
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_me(
+    payload: UpdateUsernameRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Update the authenticated user's display name."""
+    user = update_username(db, current_user, payload.name)
+    return _to_user_response(user)
+
+
+@router.post("/me/change-password", response_model=UserResponse)
+def change_my_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Change the authenticated user's password after verifying the current one."""
+    user = change_password(db, current_user, payload.current_password, payload.new_password)
+    return _to_user_response(user)
+
 
 @router.post("/google", response_model=TokenResponse)
 async def google_auth(request: GoogleAuthRequest, db: Session = Depends(get_session)):

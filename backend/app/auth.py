@@ -33,6 +33,13 @@ class GoogleAuthRequest(BaseModel):
     email: Optional[str] = None
     google_id: Optional[str] = None
 
+class UpdateUsernameRequest(BaseModel):
+    name: str = Field(..., min_length=2)
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=6)
+    new_password: str = Field(..., min_length=6)
+
 class UserResponse(BaseModel):
     id: str
     name: str
