@@ -91,7 +91,6 @@ We use three real external APIs. **Nothing is mocked in normal operation** — e
 |---|---|
 | **Anthropic SDK** | Backend → Claude. The shared `LLMClient` formats each agent's prompt, posts to `messages.create`, and parses the JSON reply. |
 | **Tavily HTTP** | Backend → Tavily. Search results are saved to `raw_evidence` so later agents (and users) can audit what the LLM saw. |
-| **Google OAuth2** | Backend → Google. Verifies the ID token, then upserts the user (links by `google_id`, falls back to email). |
 | **Expo Document Picker** | Client → Backend. Lets the user attach a pitch-deck PDF; backend extracts the text with `pypdf` and stores it as evidence. |
 | **Expo Print + Sharing** | Client-side. Wired in for share-sheet flows on the report screen. |
 | **Railway Postgres** | Backend → Postgres in prod. SQLAlchemy normalises the legacy `postgres://` scheme and enables connection pooling. |
@@ -206,30 +205,19 @@ See [backend/DEPLOY.md](backend/DEPLOY.md) for the Railway runbook.
 
 ---
 
-## 10. Assumptions
-
-1. **One user, one analysis at a time** is acceptable — no queue, no rate limiter; the orchestrator runs in FastAPI's `BackgroundTasks`.
-2. **Polling, not SSE.** The frontend polls `GET /api/analyses/{id}` every 2 s.
-3. **Web is the canonical dev target.** Session persistence uses `localStorage`; native cold launches force a re-sign-in until AsyncStorage/SecureStore is added.
-4. **LLM JSON output is recoverable.** Prompts ask for pure JSON; `_extract_json` rescues code-fenced or prose-prefixed replies. No retries on failure.
-5. **Add-only schema evolution.** `create_all()` runs on every startup; non-additive changes need Alembic added before deploy.
-6. **Wide-open CORS in dev** (`allow_origins=["*"]`) — narrow before sharing the URL.
-
----
-
-## 11. Privacy & Security Notes
+## 10. Privacy & Security Notes
 
 We store passwords as PBKDF2-SHA256 hashes (100k iterations, per-user salt) and sign sessions with an HMAC-SHA256 token whose `SECRET_KEY` **must** be overridden via env var in production. Every read/write under `/api/analyses` is scoped to the calling user, and cross-user access returns 404. The startup name, any context, and PDF text are sent to Anthropic and Tavily for processing — treat anything you paste in as shared with those providers.
 
 ---
 
-## 12. Cost & Latency
+## 11. Cost & Latency
 
 A typical run takes **~40–90 s** end-to-end (four sequential Claude calls + ~6 Tavily searches) and costs roughly **$0.05–$0.20 in API spend** (Anthropic + Tavily combined). Tavily's free tier covers ~166 analyses/month; Anthropic's per-tier RPM caps the practical concurrency around ~25 runs.
 
 ---
 
-## 13. Scalability
+## 12. Scalability
 
 The backend is a single FastAPI process today. To scale: run more Uvicorn workers, move the pipeline off `BackgroundTasks` onto a real worker (Celery/Arq + Redis), and let Railway autoscale stateless replicas. The DB is already Postgres in prod, so the data layer scales independently.
 
@@ -238,6 +226,24 @@ The backend is a single FastAPI process today. To scale: run more Uvicorn worker
 2. **Polling overhead.** Every active client polls every 2 s — fine for tens of users, wasteful at hundreds. Switch to SSE.
 3. **LLM/search latency floor.** Four sequential Claude calls + Tavily searches set the wall time; horizontal scaling can't beat it. Parallelising Hype's search with Skeptic's and caching identical startup names would cut ~10–15 s.
 4. **No retries.** A single flaky LLM/search call fails the whole run.
+
+---
+
+## 13. Robustness
+
+The pipeline keeps producing a usable report even when individual pieces misbehave. A few examples already handled in code:
+
+- **Web search fails or returns nothing** — the agent still runs against the rest of the evidence; the report is generated with whatever was available.
+- **The LLM returns messy or non-JSON output** — code fences and stray prose are stripped before parsing, so a slightly malformed reply still works.
+- **The CVO picks an unknown verdict** — it's safely defaulted to `WATCH` so the report always has a valid label.
+- **Scores come back out of range** — clamped to their allowed bounds (0–100 per agent, 0–1000 total).
+- **The uploaded pitch deck can't be read** — the pipeline continues without it instead of failing.
+- **A past report row is corrupted** — the dashboard skips that one row rather than breaking the whole list.
+- **Anything else blows up mid-pipeline** — the run is marked `failed` with a clear error message, not a 500.
+- **A session token expires** — the app catches it, signs the user out, and sends them back to the login screen automatically.
+- **Someone tries to access another user's report** — the API returns "not found" rather than revealing which IDs exist.
+
+What's **not** covered yet: automatic retries on Anthropic/Tavily errors, enforced per-agent timeouts, and live streaming reconnect — see [§15 Limitations](#15-limitations).
 
 ---
 
