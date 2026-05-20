@@ -1,13 +1,7 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth } from './AuthContext';
+import { getRecentAnalyses } from '../services/api';
 
-/**
- * Lightweight in-memory store for completed agent runs.
- *
- * No persistence yet — we don't have AsyncStorage / MMKV installed. The list
- * resets when the app process restarts. That's an acceptable trade-off for
- * the hackathon scope; the dashboard's empty-vs-populated split works as
- * long as a session contains at least one run.
- */
 export type Verdict = 'INVEST' | 'WATCH' | 'PASS' | 'ACQUIRE' | 'PIVOT' | 'ITERATE';
 
 export interface SavedReport {
@@ -24,14 +18,55 @@ export interface SavedReport {
 interface ReportsContextType {
   reports: SavedReport[];
   latestReport: SavedReport | null;
+  isLoading: boolean;
   addReport: (r: Omit<SavedReport, 'id' | 'finishedAt'> & { id?: string; finishedAt?: string }) => void;
   clearReports: () => void;
+  refresh: () => Promise<void>;
 }
 
 const ReportsContext = createContext<ReportsContextType | undefined>(undefined);
 
 export function ReportsProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [reports, setReports] = useState<SavedReport[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const refresh = useCallback(async () => {
+    if (!isAuthenticated) {
+      setReports([]);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const items = await getRecentAnalyses(20);
+      setReports(
+        items.map((it) => ({
+          id: it.id,
+          name: it.name,
+          score: it.score,
+          verdict: it.verdict,
+          finishedAt: it.finished_at,
+          breakdowns: it.breakdowns,
+        })),
+      );
+    } catch {
+      // Network/auth errors — keep whatever we already have so the dashboard
+      // doesn't flash to empty on a transient failure. AuthContext's 401
+      // handler will sign the user out separately if the token is invalid.
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  // Hydrate from the backend whenever auth state flips to authenticated; clear
+  // on sign-out so the next user doesn't see the previous user's reports.
+  useEffect(() => {
+    if (isAuthenticated) {
+      void refresh();
+    } else {
+      setReports([]);
+    }
+  }, [isAuthenticated, refresh]);
 
   const addReport = useCallback<ReportsContextType['addReport']>((r) => {
     setReports((prev) => {
@@ -50,10 +85,12 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
     () => ({
       reports,
       latestReport: reports[0] ?? null,
+      isLoading,
       addReport,
       clearReports,
+      refresh,
     }),
-    [reports, addReport, clearReports],
+    [reports, isLoading, addReport, clearReports, refresh],
   );
 
   return <ReportsContext.Provider value={value}>{children}</ReportsContext.Provider>;

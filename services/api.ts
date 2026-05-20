@@ -113,6 +113,27 @@ export function listAnalyses(limit = 10): Promise<AnalysisSummary[]> {
   return http<AnalysisSummary[]>(`/api/analyses?limit=${limit}`);
 }
 
+export type DashboardVerdict =
+  | 'INVEST'
+  | 'WATCH'
+  | 'PASS'
+  | 'ACQUIRE'
+  | 'PIVOT'
+  | 'ITERATE';
+
+export interface RecentAnalysisItem {
+  id: string;
+  name: string;
+  score: number;
+  verdict: DashboardVerdict;
+  finished_at: string;
+  breakdowns: { label: string; val: number }[];
+}
+
+export function getRecentAnalyses(limit = 10): Promise<RecentAnalysisItem[]> {
+  return http<RecentAnalysisItem[]>(`/api/analyses/recent?limit=${limit}`);
+}
+
 export interface PollOptions {
   intervalMs?: number;
   timeoutMs?: number;

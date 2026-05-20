@@ -16,6 +16,8 @@ from ..schemas import (
     AgentProgress,
     AnalysisDetail,
     AnalysisSummary,
+    DashboardBreakdown,
+    RecentAnalysisItem,
     ReportData,
 )
 from ..pdf_parser import extract_text_from_pdf
@@ -167,6 +169,64 @@ def list_analyses(
         )
     rows = db.execute(stmt).scalars().all()
     return [_to_summary(a) for a in rows]
+
+
+@router.get("/recent", response_model=List[RecentAnalysisItem])
+def get_recent_analyses(
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Recent completed analyses for the dashboard — includes the Aura score,
+    verdict, and the Market/Financials/Brand breakdowns extracted from the
+    stored report JSON."""
+    stmt = (
+        select(Analysis)
+        .where(
+            Analysis.user_id == current_user.id,
+            Analysis.status == "completed",
+            Analysis.score.isnot(None),
+            Analysis.verdict.isnot(None),
+        )
+        .order_by(Analysis.completed_at.desc())
+        .limit(limit)
+    )
+    rows = db.execute(stmt).scalars().all()
+
+    # Frontend's AuraScoreCard shows three breakdowns labeled
+    # Market / Financials / Brand — map the orchestrator's dimension names.
+    DIM_LABEL = {
+        "Market fit": "Market",
+        "Financials": "Financials",
+        "Brand power": "Brand",
+    }
+
+    items: List[RecentAnalysisItem] = []
+    for a in rows:
+        breakdowns: List[DashboardBreakdown] = []
+        if a.report_json:
+            try:
+                report = json.loads(a.report_json)
+                for d in report.get("dimensions", []):
+                    label = DIM_LABEL.get(d.get("name", ""))
+                    if label:
+                        breakdowns.append(
+                            DashboardBreakdown(label=label, val=int(d.get("score", 0)))
+                        )
+            except Exception:
+                # Corrupt report_json shouldn't break the dashboard.
+                pass
+        items.append(
+            RecentAnalysisItem(
+                id=a.id,
+                name=a.startup_name,
+                score=a.score or 0,
+                verdict=a.verdict or "WATCH",
+                finished_at=a.completed_at or a.created_at,
+                breakdowns=breakdowns,
+            )
+        )
+    return items
 
 
 @router.get("/{analysis_id}/pdf")

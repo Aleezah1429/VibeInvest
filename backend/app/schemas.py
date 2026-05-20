@@ -86,4 +86,20 @@ class AgentProgress(BaseModel):
     completed_at: Optional[datetime] = None
 
 
+class DashboardBreakdown(BaseModel):
+    label: str
+    val: int
+
+
+class RecentAnalysisItem(BaseModel):
+    """Dashboard-friendly summary — drives the home screen's recent list
+    and Aura Score card. Matches the SavedReport shape on the frontend."""
+    id: str
+    name: str
+    score: int
+    verdict: str
+    finished_at: datetime
+    breakdowns: List[DashboardBreakdown] = []
+
+
 AnalysisDetail.model_rebuild()
