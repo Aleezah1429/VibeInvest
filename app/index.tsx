@@ -598,87 +598,68 @@ function MeetAgents({ onHowItWorks }: { onHowItWorks: () => void }) {
   );
 }
 
-// ─── aura ring (svg) — used by both empty + populated ──────────────────────
-function AuraRing({ score }: { score: number; max?: number }) {
-  const r = 64;
-  const dotSize = 14;
-
-  // Spin loops forever — Animated.loop continues across renders because spin
-  // is a useRef. Going 0 → 1 maps to 0deg → 360deg, and the next iteration
-  // starts at the same visual position (360 ≡ 0), so the transition is
-  // seamless with no perceptible "reset".
-  const spin = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(spin, {
-        toValue: 1,
-        duration: 6000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-        isInteraction: false,
-      }),
-      { resetBeforeIteration: true },
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [spin]);
-  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-
+// ─── aura ring (svg) — proportional progress arc, used by empty + populated ─
+// Matches the report screen's ring: the colored arc fills in proportion to
+// score / max (was previously a full circle regardless of score).
+function AuraRing({ score, max = 1000, size = 148 }: { score: number; max?: number; size?: number }) {
+  const r = (size - 20) / 2;
+  const C0 = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(1, score / max));
+  const offset = C0 * (1 - pct);
   return (
-    <View style={{ width: 148, height: 148, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Static gradient ring — no rotation, no sharp edges from a moving
-          stroke. */}
-      <Svg
-        width={148}
-        height={148}
-        viewBox="0 0 148 148"
-        style={{ position: 'absolute' }}
-      >
-        <Defs>
-          <SvgLinearGradient id="auraRing" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0%" stopColor="#e9d4ff" />
-            <Stop offset="50%" stopColor="#a96bff" />
-            <Stop offset="100%" stopColor="#7d3fdf" />
-          </SvgLinearGradient>
-        </Defs>
-        <Circle cx={74} cy={74} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={6} fill="none" />
-        {score > 0 && (
-          <Circle cx={74} cy={74} r={r} stroke="url(#auraRing)" strokeWidth={7} fill="none" />
-        )}
-      </Svg>
-
-      {/* Orbiting dot — perfectly round + native shadow = no sharp edges. The
-          dot rides at the top of the rotating frame, so as the frame spins it
-          appears to travel around the ring. */}
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Defs>
+        <SvgLinearGradient id="auraRing" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0%" stopColor="#c79bff" />
+          <Stop offset="50%" stopColor="#9550ee" />
+          <Stop offset="100%" stopColor="#5b2ea3" />
+        </SvgLinearGradient>
+      </Defs>
+      <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.06)" strokeWidth={6} fill="none" />
       {score > 0 && (
-        <Animated.View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            width: 148,
-            height: 148,
-            transform: [{ rotate }],
-          }}
-        >
-          <View
-            style={{
-              position: 'absolute',
-              top: 74 - r - dotSize / 2,
-              left: 74 - dotSize / 2,
-              width: dotSize,
-              height: dotSize,
-              borderRadius: dotSize / 2,
-              backgroundColor: '#f3e3ff',
-              shadowColor: '#a96bff',
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.9,
-              shadowRadius: 10,
-              elevation: 8,
-            }}
+        <>
+          {/* Halo layers for the purple glow (RN-SVG has no drop-shadow). */}
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke="#9550ee"
+            strokeWidth={20}
+            opacity={0.12}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={C0}
+            strokeDashoffset={offset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
           />
-        </Animated.View>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke="#9550ee"
+            strokeWidth={12}
+            opacity={0.28}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={C0}
+            strokeDashoffset={offset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke="url(#auraRing)"
+            strokeWidth={6}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={C0}
+            strokeDashoffset={offset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        </>
       )}
-    </View>
+    </Svg>
   );
 }
 
