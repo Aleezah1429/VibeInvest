@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -312,7 +312,7 @@ function ErrorBanner({ message }: { message: string }) {
 // ── Main screen ─────────────────────────────────────────────────────────────
 export default function AuthScreen() {
   const router = useRouter();
-  const { signIn, signUp, signInWithGoogle, isLoading } = useAuth();
+  const { signIn, signUp, signInWithGoogle, isLoading, isAuthenticated } = useAuth();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [name, setName] = useState('');

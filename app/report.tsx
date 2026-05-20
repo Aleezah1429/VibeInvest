@@ -515,6 +515,46 @@ export default function ReportScreen() {
       return;
     }
     const pdfUrl = `${API_BASE_URL}/api/analyses/${id}/pdf`;
+    const safeName = (startupName || 'report').replace(/\s+/g, '_');
+    const filename = `${safeName}_due_diligence.pdf`;
+
+    // Pre-flight: surface a friendly error instead of showing the JSON 404 in a new tab.
+    try {
+      const head = await fetch(pdfUrl, { method: 'GET', headers: { Range: 'bytes=0-0' } });
+      if (!head.ok) {
+        let msg = `HTTP ${head.status}`;
+        try {
+          const body = await head.json();
+          if (body?.detail) msg = String(body.detail);
+        } catch {
+          // not JSON — keep status code
+        }
+        Alert.alert('Download Failed', msg);
+        return;
+      }
+    } catch {
+      Alert.alert('Download Failed', 'Could not reach the server. Is the backend running?');
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      try {
+        const res = await fetch(pdfUrl);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+        return;
+      } catch {
+        // fall through to browser open
+      }
+    }
+
     try {
       await WebBrowser.openBrowserAsync(pdfUrl);
     } catch {
