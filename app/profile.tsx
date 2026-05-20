@@ -255,7 +255,7 @@ export default function ProfileScreen() {
                     <Ionicons name="lock-closed" size={14} color={T.ghost} style={{ marginLeft: 6 }} />
                   }
                 />
-                <Text style={s.helper}>Email is the unique identifier for your account and can't be changed.</Text>
+                <Text style={s.helper}>{"Email is the unique identifier for your account and can't be changed."}</Text>
                 <View style={{ marginTop: 14 }}>
                   <PrimaryCTA
                     label="Save Changes"

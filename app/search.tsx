@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, ScrollView, ActivityIndicator, Alert, Animated, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, ScrollView, ActivityIndicator, Animated, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import * as DocumentPicker from 'expo-document-picker';
 import { createAnalysis, listAnalyses } from '../services/api';
 import type { AnalysisSummary } from '../services/types';
@@ -27,6 +28,7 @@ function timeAgo(iso: string): string {
 export default function SearchScreen() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
+  const toast = useToast();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -87,7 +89,7 @@ export default function SearchScreen() {
         });
       }
     } catch (err) {
-      Alert.alert('Error picking document', 'Could not select the PDF file.');
+      toast.show('Could not select the PDF file.', { type: 'error', title: 'DOCUMENT ERROR' });
     }
   };
 
@@ -118,7 +120,7 @@ export default function SearchScreen() {
   const handleAnalyze = async () => {
     const name = startupName.trim();
     if (!name) {
-      Alert.alert('Missing name', 'Enter a startup name to analyze.');
+      toast.show('Enter a startup name to analyze.', { type: 'warning', title: 'MISSING NAME' });
       return;
     }
     setSubmitting(true);
@@ -142,7 +144,7 @@ export default function SearchScreen() {
       });
       router.push({ pathname: '/loading', params: { id: analysis.id, name } });
     } catch (e: any) {
-      Alert.alert('Could not start analysis', e?.message ?? 'Backend not reachable.');
+      toast.show(e?.message ?? 'Backend not reachable.', { type: 'error', title: 'ANALYSIS FAILED' });
     } finally {
       setSubmitting(false);
     }
@@ -153,7 +155,7 @@ export default function SearchScreen() {
     if (a.status === 'completed') {
       router.push({ pathname: '/report', params: { id: a.id, name: a.startup_name } });
     } else if (a.status === 'failed') {
-      Alert.alert('Analysis failed', `${a.startup_name} did not complete.`);
+      toast.show(`${a.startup_name} did not complete.`, { type: 'error', title: 'ANALYSIS FAILED' });
     } else {
       router.push({ pathname: '/loading', params: { id: a.id, name: a.startup_name } });
     }

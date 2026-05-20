@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 // ── design tokens — mirrors VibeInvest/auth.jsx mock ────────────────────────
 const T = {
@@ -224,15 +225,15 @@ function CTA({
           end={{ x: 0, y: 1 }}
           style={styles.cta}
         >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <>
-            <Ionicons name={icon} size={16} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={styles.ctaText}>{label}</Text>
-            <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />
-          </>
-        )}
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Ionicons name={icon} size={16} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.ctaText}>{label}</Text>
+              <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />
+            </>
+          )}
         </LinearGradient>
       </TouchableOpacity>
     </View>
@@ -313,6 +314,7 @@ function ErrorBanner({ message }: { message: string }) {
 export default function AuthScreen() {
   const router = useRouter();
   const { signIn, signUp, signInWithGoogle, isLoading, isAuthenticated } = useAuth();
+  const toast = useToast();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [name, setName] = useState('');
@@ -347,7 +349,9 @@ export default function AuthScreen() {
       }
       router.replace('/');
     } catch (err: any) {
-      setErrorMessage(err?.message ?? 'An error occurred during authentication.');
+      const msg = err?.message ?? 'An error occurred during authentication.';
+      setErrorMessage(msg);
+      toast.show(msg, { type: 'error', title: 'AUTHENTICATION FAILED' });
     }
   };
 
@@ -355,9 +359,12 @@ export default function AuthScreen() {
     setErrorMessage(null);
     try {
       await signInWithGoogle();
+      toast.show('Welcome back to VibeInvest via Google!', { type: 'success', title: 'SIGNED IN' });
       router.replace('/');
     } catch (err: any) {
-      setErrorMessage(err?.message ?? 'Google Sign-in failed.');
+      const msg = err?.message ?? 'Google Sign-in failed.';
+      setErrorMessage(msg);
+      toast.show(msg, { type: 'error', title: 'OAUTH ERROR' });
     }
   };
 

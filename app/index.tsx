@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   Image,
@@ -27,6 +26,7 @@ import * as DocumentPicker from 'expo-document-picker';
 
 import { useAuth } from '../context/AuthContext';
 import { useReports, SavedReport } from '../context/ReportsContext';
+import { useToast } from '../context/ToastContext';
 import { createAnalysis } from '../services/api';
 
 // ─── search payload shape ───────────────────────────────────────────────────
@@ -188,7 +188,7 @@ function Welcome({ firstName }: { firstName: string }) {
       <Text style={s.welcomeHead}>
         Welcome, <Text>{firstName}.</Text>
         {'\n'}
-        <Text style={{ color: T.dim }}>Let's vet your first startup.</Text>
+        <Text style={{ color: T.dim }}>{"Let's vet your first startup."}</Text>
       </Text>
       <Text style={s.welcomeSub}>
         Type a name below. Four AI agents go deep on financials, market, brand and risk — then return a verdict.
@@ -296,6 +296,7 @@ function DetailField({
 
 // ─── focal search card (CTA) ───────────────────────────────────────────────
 function SearchCard({ onRun }: { onRun: (payload: SearchPayload) => void | Promise<void> }) {
+  const toast = useToast();
   const [val, setVal] = useState('');
   const [intent, setIntent] = useState<Intent | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -325,7 +326,7 @@ function SearchCard({ onRun }: { onRun: (payload: SearchPayload) => void | Promi
         setPitchDeck(result.assets[0]);
       }
     } catch {
-      Alert.alert('Upload failed', 'Could not pick a PDF.');
+      toast.show('Could not pick a PDF.', { type: 'error', title: 'UPLOAD FAILED' });
     }
   };
 
@@ -918,9 +919,10 @@ const INSIGHTS: Insight[] = [
 ];
 
 function InsightCard({ insight }: { insight: Insight }) {
+  const toast = useToast();
   const open = () => {
     Linking.openURL(insight.url).catch(() => {
-      Alert.alert('Could not open link', insight.url);
+      toast.show('Could not open the link.', { type: 'error', title: 'LINK ERROR' });
     });
   };
   return (
@@ -1142,6 +1144,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { isAuthenticated, user, signOut } = useAuth();
   const { reports, latestReport } = useReports();
+  const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -1207,7 +1210,7 @@ export default function DashboardScreen() {
           // not JSON; keep raw
         }
       }
-      Alert.alert('Analysis failed', msg);
+      toast.show(msg, { type: 'error', title: 'ANALYSIS FAILED' });
     }
   };
 

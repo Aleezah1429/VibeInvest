@@ -187,3 +187,18 @@ Defined `DELIVERABLES` array with 3 items:
 - Deal Memo Draft: FileEdit icon, amber, 4 bullets
 
 Each deliverable: accordion header with left color bar → expandable body with numbered bullets + Download/Share CTAs.
+
+---
+
+## Feature 7: Custom Glassmorphic Toast Notification System
+
+**Files**: `context/ToastContext.tsx` (created), `app/_layout.tsx` (modified), `app/search.tsx` (modified), `app/index.tsx` (modified), `app/loading.tsx` (modified), `app/auth.tsx` (modified), `app/profile.tsx` (modified)
+**Commit**: `feat: custom glassmorphic toast notification system`
+
+### Steps
+1. **Designed Toast Context** — Created `ToastProvider` and custom `useToast()` hook inside `context/ToastContext.tsx` to control toast show, hide, timer decay, and animation configurations.
+2. **Built Glassmorphic Card** — Configured an animated card using `BlurView` from `expo-blur`, custom glow overlay layers, status iconography, and exact notch safe insets via `react-native-safe-area-context`.
+3. **Mounted Provider Globally** — Incorporated the provider inside `app/_layout.tsx` surrounding the main Stack navigator to render floating toasts on top of all stack routes.
+4. **Wired up Screens** — Replaced raw native alerts with `toast.show(...)` across `app/search.tsx`, `app/index.tsx`, and `app/auth.tsx` for credential actions, search inputs, and document upload failures.
+5. **Polling Stabilizers** — Added state references in `app/loading.tsx` to capture intermittent database errors and network dropouts: warning on 3 consecutive polling failures and escaping safely on 8 consecutive dropouts.
+6. **Corrected Linter Warnings** — Cleaned up unused variables and escaped unescaped JSX quotes in `app/index.tsx` and `app/profile.tsx` to maintain strict quality standards.

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Fonts } from '../constants/theme';
 import { getAnalysis } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import type { AnalysisDetail } from '../services/types';
 
 const POLL_INTERVAL_MS = 1500;
@@ -425,11 +426,13 @@ export default function LoadingScreen() {
   const router = useRouter();
   const { name, id } = useLocalSearchParams<{ name: string; id?: string }>();
   const startupName = name || 'Bykea';
+  const toast = useToast();
 
   const [agentIdx, setAgentIdx] = useState(0);
   const [progress, setProgress] = useState(0);
   const [hasRealRun, setHasRealRun] = useState<boolean>(!!id);
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const consecutiveFailures = useRef(0);
 
   const handleDone = useCallback(() => {
     router.replace({ pathname: '/handoff', params: { name: startupName, ...(id ? { id } : {}) } });
@@ -483,6 +486,7 @@ export default function LoadingScreen() {
         const a: AnalysisDetail = await getAnalysis(id);
         if (cancelled) return;
         setHasRealRun(true);
+        consecutiveFailures.current = 0; // reset failures on success
 
         // Pick the visible agent: latest 'running' run, or last 'done' run.
         const runs = a.progress || [];
@@ -501,11 +505,19 @@ export default function LoadingScreen() {
           return;
         }
         if (a.status === 'failed') {
+          toast.show('Our CVO flagged a major issue. Analysis failed.', { type: 'error', title: 'ANALYSIS RUN FAILED' });
           handleSkip();
           return;
         }
-      } catch {
-        // Backend hiccup — keep polling.
+      } catch (err: any) {
+        consecutiveFailures.current += 1;
+        if (consecutiveFailures.current === 3) {
+          toast.show('Backend connection unstable. Retrying...', { type: 'warning', title: 'CONNECTION INTERRUPTED' });
+        } else if (consecutiveFailures.current >= 8) {
+          toast.show('Lost connection to analysis server. Returning to report.', { type: 'error', title: 'CONNECTION LOST' });
+          handleSkip();
+          return;
+        }
       }
       if (!cancelled) timeoutHandle = setTimeout(tick, POLL_INTERVAL_MS);
     };
