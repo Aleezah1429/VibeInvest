@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { apiSignIn, apiSignUp, apiGoogleAuth } from '../services/api';
 
@@ -20,10 +21,56 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Web-only persistence using localStorage. No AsyncStorage/SecureStore is installed,
+// so native cold-starts remain unauthenticated until one of those is added.
+const STORAGE_KEY = 'vibe.auth.session';
+
+interface PersistedSession {
+  user: User;
+  token: string;
+}
+
+const hasLocalStorage =
+  Platform.OS === 'web' && typeof globalThis !== 'undefined' && typeof (globalThis as any).localStorage !== 'undefined';
+
+function loadSession(): PersistedSession | null {
+  if (!hasLocalStorage) return null;
+  try {
+    const raw = (globalThis as any).localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.user?.email || !parsed?.token) return null;
+    return parsed as PersistedSession;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(session: PersistedSession | null) {
+  if (!hasLocalStorage) return;
+  try {
+    const ls = (globalThis as any).localStorage;
+    if (session) ls.setItem(STORAGE_KEY, JSON.stringify(session));
+    else ls.removeItem(STORAGE_KEY);
+  } catch {
+    // private-mode / quota — ignore
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [user, setUser] = useState<User | null>(null);
+  const initial = loadSession();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!initial);
+  const [user, setUser] = useState<User | null>(initial?.user ?? null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Keep profile edits persisted across refresh on web.
+  useEffect(() => {
+    if (!hasLocalStorage || !isAuthenticated || !user) return;
+    const current = loadSession();
+    if (current && current.user.email === user.email) {
+      saveSession({ user, token: current.token });
+    }
+  }, [user, isAuthenticated]);
 
   const triggerHaptic = async (type: 'success' | 'warning' | 'error' | 'light') => {
     try {
@@ -75,8 +122,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     try {
       const res = await apiSignIn(email, password);
+      const nextUser = { name: res.user.name, email: res.user.email };
+      saveSession({ user: nextUser, token: res.access_token });
       setIsAuthenticated(true);
-      setUser({ name: res.user.name, email: res.user.email });
+      setUser(nextUser);
       setIsLoading(false);
       await triggerHaptic('success');
     } catch (err: any) {
@@ -92,8 +141,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const res = await apiSignUp(name, email, password);
+      const nextUser = { name: res.user.name, email: res.user.email };
+      saveSession({ user: nextUser, token: res.access_token });
       setIsAuthenticated(true);
-      setUser({ name: res.user.name, email: res.user.email });
+      setUser(nextUser);
       setIsLoading(false);
       await triggerHaptic('success');
     } catch (err: any) {
@@ -116,9 +167,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'google.investor@gmail.com',
         'mock-google-id-123456'
       );
-      
+
+      const nextUser = { name: res.user.name, email: res.user.email };
+      saveSession({ user: nextUser, token: res.access_token });
       setIsAuthenticated(true);
-      setUser({ name: res.user.name, email: res.user.email });
+      setUser(nextUser);
       setIsLoading(false);
       await triggerHaptic('success');
     } catch (err: any) {
@@ -130,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await triggerHaptic('light');
+    saveSession(null);
     setIsAuthenticated(false);
     setUser(null);
   };
