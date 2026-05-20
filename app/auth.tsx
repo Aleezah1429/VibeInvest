@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function AuthScreen() {
   const router = useRouter();
-  const { signIn, signUp, signInWithGoogle, isLoading } = useAuth();
+  const { signIn, signUp, signInWithGoogle, isLoading, isAuthenticated } = useAuth();
 
   // Mode: 'signin' | 'signup'
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -36,6 +36,19 @@ export default function AuthScreen() {
   const [focusName, setFocusName] = useState(false);
   const [focusEmail, setFocusEmail] = useState(false);
   const [focusPassword, setFocusPassword] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      const timer = setTimeout(() => {
+        router.replace('/');
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated]);
+
+  if (isAuthenticated) {
+    return null; // Avoid flashing auth screen if already logged in
+  }
 
   // Quick email format validator
   const isValidEmail = (text: string) => {
