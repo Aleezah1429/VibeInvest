@@ -604,24 +604,32 @@ function AuraRing({ score, max = 1000 }: { score: number; max?: number }) {
     <Svg width={148} height={148} viewBox="0 0 148 148">
       <Defs>
         <SvgLinearGradient id="auraRing" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0%" stopColor="#c79bff" />
-          <Stop offset="50%" stopColor="#9550ee" />
-          <Stop offset="100%" stopColor="#5b2ea3" />
+          <Stop offset="0%" stopColor="#e9d4ff" />
+          <Stop offset="50%" stopColor="#a96bff" />
+          <Stop offset="100%" stopColor="#7d3fdf" />
         </SvgLinearGradient>
+        <RadialGradient id="auraRingHalo" cx="50%" cy="50%" r="50%">
+          <Stop offset="55%" stopColor="#9550ee" stopOpacity={0} />
+          <Stop offset="78%" stopColor="#9550ee" stopOpacity={0.28} />
+          <Stop offset="100%" stopColor="#9550ee" stopOpacity={0} />
+        </RadialGradient>
       </Defs>
+      {score > 0 && (
+        <Circle cx={74} cy={74} r={68} fill="url(#auraRingHalo)" />
+      )}
       <Circle cx={74} cy={74} r={r} stroke="rgba(255,255,255,0.06)" strokeWidth={6} fill="none" />
       {score > 0 && (
         <>
-          {/* Two wider, translucent halo strokes simulate the CSS
-              `filter: drop-shadow(0 0 6px rgba(149,80,238,0.6))` glow that
-              RN's SVG primitives can't render natively. */}
+          {/* Stacked translucent halos approximate a CSS drop-shadow glow:
+              widest+softest underneath, tightening toward the crisp gradient
+              ring on top. */}
           <Circle
             cx={74}
             cy={74}
             r={r}
             stroke="#9550ee"
-            strokeWidth={18}
-            opacity={0.12}
+            strokeWidth={28}
+            opacity={0.10}
             fill="none"
             strokeLinecap="round"
             strokeDasharray={C0}
@@ -632,9 +640,22 @@ function AuraRing({ score, max = 1000 }: { score: number; max?: number }) {
             cx={74}
             cy={74}
             r={r}
-            stroke="#9550ee"
+            stroke="#a96bff"
+            strokeWidth={18}
+            opacity={0.22}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={C0}
+            strokeDashoffset={offset}
+            transform="rotate(-90 74 74)"
+          />
+          <Circle
+            cx={74}
+            cy={74}
+            r={r}
+            stroke="#c79bff"
             strokeWidth={11}
-            opacity={0.28}
+            opacity={0.45}
             fill="none"
             strokeLinecap="round"
             strokeDasharray={C0}
@@ -646,7 +667,7 @@ function AuraRing({ score, max = 1000 }: { score: number; max?: number }) {
             cy={74}
             r={r}
             stroke="url(#auraRing)"
-            strokeWidth={6}
+            strokeWidth={7}
             fill="none"
             strokeLinecap="round"
             strokeDasharray={C0}
@@ -951,10 +972,10 @@ function QuickInsights() {
 }
 
 const TRENDING = [
-  { name: 'Bazaar Tech', sector: 'B2B Retail', stat: '↑ 142%', heat: 'HOT' as const, logo: require('../assets/images/bazaar.png') },
-  { name: 'Retailo', sector: 'Distribution', stat: '↑ 21%', heat: 'NEW' as const, logo: require('../assets/images/retailo.png') },
-  { name: 'Truck It In', sector: 'Logistics', stat: '↑ 48%', heat: 'BUZZ' as const, logo: require('../assets/images/Truckitin.png') },
-  { name: 'Sadapay', sector: 'Fintech', stat: '↑ 87%', heat: 'HOT' as const, logo: require('../assets/images/sadapay.png') },
+  { name: 'Bazaar Tech', sector: 'B2B Retail', stat: '↑ 142%', heat: 'HOT' as const, logo: require('../assets/images/bazaar.png'), bg: '#000' },
+  { name: 'Retailo', sector: 'Distribution', stat: '↑ 21%', heat: 'NEW' as const, logo: require('../assets/images/retailo.png'), bg: '#fff' },
+  { name: 'Truck It In', sector: 'Logistics', stat: '↑ 48%', heat: 'BUZZ' as const, logo: require('../assets/images/Truckitin.png'), bg: '#fff' },
+  { name: 'Sadapay', sector: 'Fintech', stat: '↑ 87%', heat: 'HOT' as const, logo: require('../assets/images/sadapay.png'), bg: '#fff' },
 ];
 
 function Trending({ onPick }: { onPick: (name: string) => void }) {
@@ -977,7 +998,7 @@ function Trending({ onPick }: { onPick: (name: string) => void }) {
           return (
             <TouchableOpacity key={t.name} onPress={() => onPick(t.name)} style={s.trendCard}>
               <View style={s.trendRow}>
-                <View style={s.trendInitial}>
+                <View style={[s.trendInitial, { backgroundColor: t.bg }]}>
                   <Image source={t.logo} style={s.trendLogo} resizeMode="contain" />
                 </View>
                 <View style={[s.heatChip, { backgroundColor: heatStyles.bg, borderColor: heatStyles.border }]}>
@@ -1132,11 +1153,6 @@ export default function DashboardScreen() {
 
   const hasReports = reports.length > 0;
 
-  // Trending tiles → name only.
-  const goRunByName = (companyName: string) => {
-    router.push({ pathname: '/search', params: { name: companyName } });
-  };
-
   // SearchCard → kick off the agent pipeline immediately. Calls createAnalysis
   // with the full payload, then pushes the user straight to /loading so the
   // boardroom animation begins. If the backend isn't reachable, we still
@@ -1180,15 +1196,10 @@ export default function DashboardScreen() {
   };
 
   const handleProfile = () => {
-    Alert.alert('Profile', 'Profile settings are coming soon.', [{ text: 'OK' }]);
+    router.push('/profile');
   };
   const handleReports = () => {
-    if (reports.length === 0) {
-      Alert.alert('Reports', 'No reports yet. Run your first due diligence to see history.', [{ text: 'OK' }]);
-      return;
-    }
-    // Navigate to the most recent report.
-    router.push({ pathname: '/report', params: { name: reports[0].name } });
+    router.push('/reports');
   };
   const handleLogout = async () => {
     try {
@@ -1227,7 +1238,7 @@ export default function DashboardScreen() {
             <View style={{ height: 22 }} />
             <EmptyAura />
             <View style={{ height: 22 }} />
-            <Trending onPick={goRunByName} />
+            <Trending onPick={(companyName) => goRunDetailed({ name: companyName, intent: 'Research' })} />
             <View style={{ height: 6 }} />
             <EmptyHistory />
           </>

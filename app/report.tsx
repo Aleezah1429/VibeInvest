@@ -17,8 +17,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
+import * as WebBrowser from 'expo-web-browser';
 import {
   CircleDollarSign,
   Crown,
@@ -100,158 +99,6 @@ const DELIVERABLES: { key: string; icon: LucideIcon; title: string; sub: string;
   { key: 'questions', icon: FileQuestion, title: 'Questions to Ask',  sub: '12 sharp questions for the founder', color: T.purpleInk },
   { key: 'memo',      icon: FileEdit,     title: 'Deal Memo Draft',   sub: 'Editable doc · 800 words',          color: T.amber },
 ];
-
-// ─── PDF builder (used by the save button) ─────────────────────────────────
-const HTML_ESC: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-  "'": '&#39;',
-};
-const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => HTML_ESC[c] ?? c);
-
-function buildReportHtml(report: ReportData, displayName: string): string {
-  const verdictLabel = report.verdict === 'PASS' ? 'REJECTED' : report.verdict;
-  const subText = report.verdict_sub ? ` · ${esc(report.verdict_sub)}` : '';
-
-  const verdictClassMap: Record<string, string> = {
-    INVEST: 'inv',
-    PASS: 'pass',
-    WATCH: 'watch',
-    PIVOT: 'watch',
-    ACQUIRE: 'acq',
-  };
-  const verdictClass = verdictClassMap[report.verdict] ?? 'watch';
-
-  const tagsHtml = report.tags
-    .slice(0, 6)
-    .map((t) => `<span class="tag">${esc(t)}</span>`)
-    .join('');
-
-  const dimsHtml = report.dimensions
-    .map((d) => {
-      const pct = Math.max(0, Math.min(100, d.score));
-      return `<div class="dim">
-        <span class="dim-name">${esc(d.name)}</span>
-        <span class="dim-track"><span class="dim-fill" style="width:${pct}%"></span></span>
-        <span class="dim-score">${d.score}</span>
-      </div>`;
-    })
-    .join('');
-
-  const metricsHtml = report.metrics
-    .map((m) => {
-      const tone =
-        m.change_type === 'positive'
-          ? '#1e8c5f'
-          : m.change_type === 'negative'
-          ? '#c33646'
-          : m.change_type === 'warning'
-          ? '#b07410'
-          : '#6b6478';
-      return `<div class="metric">
-        <div class="metric-label">${esc(m.label.toUpperCase())}</div>
-        <div class="metric-value">${esc(m.value)}</div>
-        <div class="metric-change" style="color:${tone}">${esc(m.change)}</div>
-      </div>`;
-    })
-    .join('');
-
-  const agentsHtml =
-    report.agent_reports.length === 0
-      ? '<p class="muted">No agent reports surfaced for this run.</p>'
-      : report.agent_reports
-          .map((a) => {
-            const findings =
-              a.findings.length > 0
-                ? `<ul class="findings">${a.findings
-                    .map((f) => `<li>${esc(f.text)}</li>`)
-                    .join('')}</ul>`
-                : '';
-            return `<div class="agent">
-              <div class="agent-head">
-                <span class="agent-name">${esc(a.name)}</span>
-                <span class="agent-role">${esc(a.role.toUpperCase())}</span>
-              </div>
-              <p class="agent-body">${esc(a.body)}</p>
-              ${findings}
-            </div>`;
-          })
-          .join('');
-
-  const date = new Date().toLocaleDateString('en-GB', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(displayName)} — Aura Report</title>
-<style>
-  *{box-sizing:border-box}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Inter",Helvetica,Arial,sans-serif;background:#fff;color:#15121f;margin:0;padding:40px;line-height:1.5}
-  .brand{font-size:10.5px;letter-spacing:2px;color:#9550ee;font-weight:700;margin-bottom:6px;font-family:"SF Mono",Menlo,monospace}
-  .header{border-bottom:2px solid #9550ee;padding-bottom:14px;margin-bottom:22px}
-  .startup{font-size:28px;font-weight:700;letter-spacing:-0.5px}
-  .tags{margin-top:8px}
-  .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:#f4f0ff;color:#7b3bd9;font-size:10px;font-weight:500;margin-right:4px;margin-bottom:4px}
-  .score-block{margin:22px 0;padding:24px;background:#f8f6ff;border-radius:16px;border:1px solid #e5dffa;text-align:center}
-  .eyebrow{font-family:"SF Mono",Menlo,monospace;font-size:9px;letter-spacing:1.4px;color:#6b6478;font-weight:600}
-  .score-num{font-size:60px;font-weight:600;color:#15121f;letter-spacing:-2px;line-height:1;margin-top:6px}
-  .score-max{font-size:14px;color:#6b6478;margin-left:4px}
-  .pill{display:inline-block;margin-top:12px;padding:6px 14px;border-radius:8px;border:1px solid;font-size:11px;font-weight:700;letter-spacing:1.2px;font-family:"SF Mono",Menlo,monospace}
-  .pill.inv{color:#1e8c5f;background:#e8faf1;border-color:#b5e6cf}
-  .pill.pass{color:#c33646;background:#fdebee;border-color:#f4c5cd}
-  .pill.watch{color:#b07410;background:#fef4e3;border-color:#f4dcb0}
-  .pill.acq{color:#7b3bd9;background:#f4f0ff;border-color:#d8c5fc}
-  h2{font-family:"SF Mono",Menlo,monospace;font-size:9.5px;letter-spacing:1.4px;color:#6b6478;font-weight:600;margin:28px 0 12px;text-transform:uppercase}
-  .dim{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-  .dim-name{flex:0 0 110px;font-size:12px;color:#4a4555;font-weight:500}
-  .dim-track{flex:1;height:6px;background:#ece8f4;border-radius:4px;overflow:hidden}
-  .dim-fill{display:block;height:100%;background:#9550ee;border-radius:4px}
-  .dim-score{flex:0 0 32px;text-align:right;font-size:12px;font-weight:600;font-family:"SF Mono",Menlo,monospace}
-  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .metric{background:#f8f6ff;border:1px solid #ece8f4;border-radius:12px;padding:12px}
-  .metric-label{font-family:"SF Mono",Menlo,monospace;font-size:9.5px;color:#6b6478;letter-spacing:1.2px;font-weight:600;margin-bottom:6px}
-  .metric-value{font-size:18px;font-weight:700;color:#15121f}
-  .metric-change{font-family:"SF Mono",Menlo,monospace;font-size:11px;margin-top:4px;letter-spacing:0.4px}
-  .agent{margin-bottom:14px;padding:14px;background:#fafafa;border:1px solid #ece8f4;border-radius:12px}
-  .agent-head{margin-bottom:8px}
-  .agent-name{font-size:13.5px;font-weight:600;color:#15121f}
-  .agent-role{font-family:"SF Mono",Menlo,monospace;font-size:10px;color:#6b6478;letter-spacing:1.2px;margin-left:6px}
-  .agent-body{font-size:12.5px;color:#4a4555;margin:6px 0}
-  .findings{margin:8px 0 0;padding-left:18px}
-  .findings li{font-size:12px;color:#4a4555;margin-bottom:3px}
-  .muted{color:#6b6478;font-size:12px}
-  .footer{margin-top:38px;padding-top:14px;border-top:1px solid #ece8f4;text-align:center;color:#6b6478;font-size:10px;letter-spacing:0.4px;font-family:"SF Mono",Menlo,monospace}
-</style></head>
-<body>
-  <div class="header">
-    <div class="brand">◢ VIBEINVEST · AURA REPORT</div>
-    <div class="startup">${esc(displayName)}</div>
-    ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
-  </div>
-
-  <div class="score-block">
-    <div class="eyebrow">◢ AURA SCORE</div>
-    <div><span class="score-num">${report.score}</span><span class="score-max">/ 1000</span></div>
-    <div><span class="pill ${verdictClass}">${esc(verdictLabel)}${subText}</span></div>
-  </div>
-
-  <h2>◢ Dimensions</h2>
-  ${dimsHtml}
-
-  <h2>◢ Key metrics</h2>
-  <div class="metrics">${metricsHtml || '<p class="muted">No metrics surfaced.</p>'}</div>
-
-  <h2>◢ Agent reports</h2>
-  ${agentsHtml}
-
-  <div class="footer">Generated ${esc(date)} · VibeInvest</div>
-</body></html>`;
-}
 
 function buildBullets(report: ReportData, key: string): string[] {
   if (key === 'brief') {
@@ -551,24 +398,45 @@ export default function ReportScreen() {
   const router = useRouter();
   const { name, id } = useLocalSearchParams<{ name: string; id?: string }>();
 
-  const [report, setReport] = useState<ReportData | null>(id ? null : PLACEHOLDER_REPORT);
+  const { reports, addReport } = useReports();
+
+  // When viewing from history (no backend id), hydrate the placeholder with
+  // whatever we already know about this run (name + summary). This avoids
+  // showing Bykea data when the user taps Retailo from the recent list.
+  const [report, setReport] = useState<ReportData | null>(() => {
+    if (id) return null;
+    const matched = name
+      ? reports.find((r) => r.name.toLowerCase() === name.toLowerCase())
+      : undefined;
+    if (name || matched) {
+      // Saved verdicts can be PIVOT/ITERATE which aren't in ReportData's
+      // narrower Verdict union — VerdictPill falls back to WATCH styling
+      // for those, so it's safe to cast.
+      const verdict = (matched?.verdict ?? PLACEHOLDER_REPORT.verdict) as ReportData['verdict'];
+      return {
+        ...PLACEHOLDER_REPORT,
+        startup_name: matched?.name ?? name ?? PLACEHOLDER_REPORT.startup_name,
+        score: matched?.score ?? PLACEHOLDER_REPORT.score,
+        verdict,
+        verdict_sub: undefined,
+      };
+    }
+    return PLACEHOLDER_REPORT;
+  });
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Save to dashboard's in-memory store on first load — guarded so the recent
-  // list doesn't duplicate if the screen re-renders.
-  const { addReport } = useReports();
+  // The store-write is now done ONLY inside the getAnalysis success branch
+  // below, so the placeholder fallback can never leak Bykea into history.
+  // Kept a ref to ensure we never double-add if the screen re-renders.
   const savedRef = useRef(false);
-  useEffect(() => {
-    if (!report || savedRef.current) return;
-    savedRef.current = true;
-    const dims = report.dimensions.slice(0, 3).map((d) => ({ label: d.name, val: d.score }));
-    addReport({
-      name: report.startup_name,
-      score: report.score,
-      verdict: report.verdict,
-      breakdowns: dims,
-    });
-  }, [report, addReport]);
+
+  // Build a placeholder display object that uses the user's actual startup
+  // name (from the URL) so a backend failure doesn't show "Bykea" instead
+  // of e.g. "Retailo".
+  const placeholderWithUrlName = (): ReportData => ({
+    ...PLACEHOLDER_REPORT,
+    startup_name: name ?? PLACEHOLDER_REPORT.startup_name,
+  });
 
   // Load real analysis when an id is passed.
   useEffect(() => {
@@ -577,22 +445,38 @@ export default function ReportScreen() {
     getAnalysis(id)
       .then((a) => {
         if (cancelled) return;
-        if (a.report) setReport(a.report);
-        else if (a.status === 'failed') {
+        if (a.report) {
+          setReport(a.report);
+          // Save the REAL report to the dashboard store — and only here.
+          // Never on placeholder fallback, never on history navigation.
+          if (!savedRef.current) {
+            savedRef.current = true;
+            const dims = a.report.dimensions
+              .slice(0, 3)
+              .map((d) => ({ label: d.name, val: d.score }));
+            addReport({
+              name: a.report.startup_name,
+              score: a.report.score,
+              verdict: a.report.verdict,
+              breakdowns: dims,
+            });
+          }
+        } else if (a.status === 'failed') {
           setLoadError(a.error || 'Analysis failed.');
-          setReport(PLACEHOLDER_REPORT);
+          setReport(placeholderWithUrlName());
         } else {
-          setReport(PLACEHOLDER_REPORT);
+          setReport(placeholderWithUrlName());
         }
       })
       .catch((e) => {
         if (cancelled) return;
         setLoadError(e?.message || 'Could not load report.');
-        setReport(PLACEHOLDER_REPORT);
+        setReport(placeholderWithUrlName());
       });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // Animated score countup (0 → target over 1500ms with eased curve).
@@ -622,31 +506,21 @@ export default function ReportScreen() {
   const [expandedAgent, setExpandedAgent] = useState<number | null>(1);
   const [expandedDeliv, setExpandedDeliv] = useState<string | null>('brief');
 
-  // Generate the PDF locally on-device (no backend round-trip needed) and
-  // open the native share sheet so the user can save it to Files / Drive /
-  // mail / WhatsApp. Works offline and on placeholder reports too.
+  // Open the backend-generated PDF for this run. Backend renders the
+  // canonical, fully-formatted document; the local HTML-to-PDF approach
+  // only re-exported the on-screen UI and lost most of the real content.
   const handleDownloadPdf = async () => {
-    if (!report) return;
+    if (!id) {
+      Alert.alert('Error', 'Cannot download report: No analysis ID available.');
+      return;
+    }
+    const pdfUrl = `${API_BASE_URL}/api/analyses/${id}/pdf`;
     try {
-      const html = buildReportHtml(report, startupName);
-      const { uri } = await Print.printToFileAsync({ html, base64: false });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          UTI: 'com.adobe.pdf',
-          mimeType: 'application/pdf',
-          dialogTitle: `${startupName} — Aura Report`,
-        });
-      } else {
-        // Web / unsupported platform — fall back to opening the local URI.
-        Linking.openURL(uri).catch(() => {
-          Alert.alert('Saved', `PDF saved at:\n${uri}`);
-        });
-      }
-    } catch (err) {
-      Alert.alert(
-        'Save failed',
-        err instanceof Error ? err.message : 'Could not generate the PDF.',
-      );
+      await WebBrowser.openBrowserAsync(pdfUrl);
+    } catch {
+      Linking.openURL(pdfUrl).catch(() => {
+        Alert.alert('Download Failed', 'Could not open the PDF report link.');
+      });
     }
   };
 

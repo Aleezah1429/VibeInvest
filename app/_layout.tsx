@@ -62,6 +62,8 @@ export default function RootLayout() {
             <Stack.Screen name="handoff" />
             <Stack.Screen name="report" />
             <Stack.Screen name="how-they-work" />
+            <Stack.Screen name="profile" />
+            <Stack.Screen name="reports" />
           </Stack>
           <StatusBar style="light" />
           
