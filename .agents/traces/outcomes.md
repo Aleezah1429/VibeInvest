@@ -41,7 +41,7 @@
 | Native session persistence | `AuthContext.tsx` | ⬜ Missing |
 | Automated tests | — | ⬜ Missing |
 
-**Live backend**: `https://vibeinvest-backend-production.up.railway.app` — `/health` 200, auth + DB verified.
+**Live backend**: `https://vibeinvest-production.up.railway.app` — `/health` 200, auth + DB verified.
 
 ---
 

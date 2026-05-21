@@ -54,7 +54,7 @@ VibeInvest/
 `services/api.ts` (231 lines) is a typed `fetch` client; `services/types.ts` mirrors `backend/app/schemas.py`. The 2026-05-17 trace reported "no `services/` directory" — that is no longer true. All screens now call the real API.
 
 ### 2. There is a real, deployed backend
-`backend/` is a FastAPI application running on Railway against a Railway-managed PostgreSQL database (`https://vibeinvest-backend-production.up.railway.app`). The 4-agent pipeline, Aura Score scoring, auth, and PDF generation all run server-side.
+`backend/` is a FastAPI application running on Railway against a Railway-managed PostgreSQL database (`https://vibeinvest-production.up.railway.app`). The 4-agent pipeline, Aura Score scoring, auth, and PDF generation all run server-side.
 
 ### 3. The pipeline is poll-based, not SSE
 The PRD specified an SSE stream (`POST /api/run/google-adk`). The implementation instead uses request/poll: `createAnalysis()` POSTs to `/api/analyses`, then `pollAnalysis()` polls `GET /api/analyses/{id}` every 2 s (240 s timeout) until `status` is `completed`/`failed`. No `EventSource`, no SSE library — a deliberate, simpler choice for React Native.

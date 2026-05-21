@@ -67,7 +67,7 @@ report (/report) → search (/search)
 
 ## API Contract (actual — implemented)
 
-Base URL resolves from `EXPO_PUBLIC_API_BASE_URL`, production = `https://vibeinvest-backend-production.up.railway.app`.
+Base URL resolves from `EXPO_PUBLIC_API_BASE_URL`, production = `https://vibeinvest-production.up.railway.app`.
 
 **Auth** (`backend/app/routes/auth.py`)
 - `POST /api/auth/signup` `{name,email,password}` → `TokenResponse`

@@ -157,4 +157,4 @@ The splash is an overlay above the navigator, not a route — navigation is live
 1. Backend deployed to Railway — `backend/` root dir, `Procfile` start command, Postgres service linked via `DATABASE_URL` reference.
 2. `init_db()` provisions all tables on first boot.
 3. Verified live — `/health` 200, `/api/auth/signin` 401 + valid JSON (DB + auth confirmed).
-4. `EXPO_PUBLIC_API_BASE_URL` set in `.env` (local dev) and every `eas.json` build profile (APK builds) → `https://vibeinvest-backend-production.up.railway.app`.
+4. `EXPO_PUBLIC_API_BASE_URL` set in `.env` (local dev) and every `eas.json` build profile (APK builds) → `https://vibeinvest-production.up.railway.app`.

@@ -8,7 +8,7 @@ status: completed
 # Link Railway-deployed backend to Expo frontend for APK builds
 
 ## What was done
-Pointed the Expo app at the deployed backend (`https://vibeinvest-backend-production.up.railway.app`) by setting `EXPO_PUBLIC_API_BASE_URL` in `.env` for local dev and in every `eas.json` build profile so that EAS-built APKs use the production URL instead of falling back to localhost.
+Pointed the Expo app at the deployed backend (`https://vibeinvest-production.up.railway.app`) by setting `EXPO_PUBLIC_API_BASE_URL` in `.env` for local dev and in every `eas.json` build profile so that EAS-built APKs use the production URL instead of falling back to localhost.
 
 ## Reasoning
 `services/api.ts` already resolves `API_BASE_URL` from `process.env.EXPO_PUBLIC_API_BASE_URL`, falling back to `localhost`/`10.0.2.2`, so no code change was needed — only configuration. The value had to be set in two places: `.env` covers `npx expo start` (dev), but `.env` is gitignored and therefore never uploaded to the EAS Build server, so the same var was added to `eas.json` build profiles to keep APK builds correct. The URL is a public endpoint (no secret), so committing it in `eas.json` is safe.

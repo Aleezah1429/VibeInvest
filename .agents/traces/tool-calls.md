@@ -172,7 +172,7 @@ psql … -c "select version()"      # confirm PostgreSQL 18.4
 ### Terminal
 ```
 eas build:configure
-curl https://vibeinvest-backend-production.up.railway.app/docs          # 200
+curl https://vibeinvest-production.up.railway.app/docs          # 200
 curl "https://…/api/auth/signin"                                        # 401 + JSON (DB ok)
 grep -n "allow_origins" backend/app/main.py
 ```
