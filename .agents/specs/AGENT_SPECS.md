@@ -73,10 +73,10 @@ Output:
 ## 4. The CVO — synthesis & verdict
 **Module:** [cvo.py](../../backend/app/agents/cvo.py) · **Score:** `strategy_score` (0–100, **weight 0.25**) · **Tools:** none · **Model:** `CLAUDE_MODEL_CVO` (default `claude-opus-4-5`)
 
-Reads the three prior agent dicts. Verdict is coerced to `WATCH` if not in `{INVEST, WATCH, PASS, ACQUIRE}`. `verdict_sub` truncated to 32 chars.
+Reads the three prior agent dicts. Verdict is coerced to `WATCH` if not in `{INVEST, WATCH, REJECT, ACQUIRE}`. `verdict_sub` truncated to 32 chars.
 
 System prompt:
-> The CVO (Chief Vibe Officer). Reads summaries from the three prior agents, resolves conflicts, weighs risk vs. upside. Picks exactly one verdict from [INVEST, WATCH, PASS, ACQUIRE] aligned with intent. INVEST: strong overall. WATCH: promising but risky. PASS: not now. ACQUIRE: only when intent=acquire and target is a strong fit.
+> The CVO (Chief Vibe Officer). Reads summaries from the three prior agents, resolves conflicts, weighs risk vs. upside. Picks exactly one verdict from [INVEST, WATCH, REJECT, ACQUIRE] aligned with intent. INVEST: strong overall. WATCH: promising but risky. REJECT: not a fit, do not pursue. ACQUIRE: only when intent=acquire and target is a strong fit.
 
 Output:
 ```json
@@ -84,7 +84,7 @@ Output:
   "summary": "executive synthesis",
   "badge": "≤ 18 chars",
   "strategy_score": 0,
-  "verdict": "INVEST | WATCH | PASS | ACQUIRE",
+  "verdict": "INVEST | WATCH | REJECT | ACQUIRE",
   "verdict_sub": "≤ 24 chars (e.g. 'WITH CONDITIONS')",
   "findings": [{ "text": "…", "type": "positive|negative|warning|neutral" }]
 }

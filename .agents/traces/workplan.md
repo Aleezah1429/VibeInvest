@@ -109,7 +109,7 @@ TokenResponse   { access_token, token_type, user: AuthUser }
 AuthUser        { id, name, email, created_at }
 ```
 
-`Verdict = 'INVEST' | 'WATCH' | 'PASS' | 'ACQUIRE'`. The dashboard widget additionally renders `'PIVOT' | 'ITERATE'` (`api.ts:DashboardVerdict`).
+`Verdict = 'INVEST' | 'WATCH' | 'REJECT' | 'ACQUIRE'`. The dashboard widget additionally renders `'PIVOT' | 'ITERATE'` (`api.ts:DashboardVerdict`).
 
 ---
 

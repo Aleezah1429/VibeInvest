@@ -139,7 +139,7 @@ The CVO picks exactly one of:
 
 - **`INVEST`** — strong overall. Go for it.
 - **`WATCH`** — promising but risky. Revisit later.
-- **`PASS`** — not now. (Displayed in the UI/PDF as **REJECT**.)
+- **`REJECT`** — not now.
 - **`ACQUIRE`** — only when the user's intent is `acquire` and the target is a strong strategic fit.
 
 ---

@@ -72,7 +72,7 @@ The splash is an overlay above the navigator, not a route — navigation is live
 **File**: `app/report.tsx` (1194 lines)
 
 1. Aura Score count-up (0 → score) with cubic easing; verdict stamp with `Animated.spring`.
-2. `PASS` renders as a red **REJECTED** stamp.
+2. `REJECT` renders as a red **REJECTED** stamp.
 3. Dimension bars, key-metric grid, expandable agent report cards — all bound to live `ReportData`.
 4. Master **PDF** and **Share** controls in the header.
 5. Deliverables accordion; "New Analysis" CTA → `/search`.

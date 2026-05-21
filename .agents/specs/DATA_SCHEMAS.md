@@ -27,7 +27,7 @@ Tables are created on startup via `Base.metadata.create_all()`. A small additive
 | `intent`, `sector`, `stage`, `funding`, `context` | TEXT? | Free-form hints |
 | `status` | TEXT | `queued` → `running` → `completed` / `failed` |
 | `score` | INT? | 0–1000 Aura score |
-| `verdict` | TEXT? | `INVEST` / `WATCH` / `PASS` / `ACQUIRE` |
+| `verdict` | TEXT? | `INVEST` / `WATCH` / `REJECT` / `ACQUIRE` |
 | `verdict_sub` | TEXT? | ≤ 32 chars |
 | `report_json` | TEXT? | Denormalised `ReportData` blob |
 | `error` | TEXT? | Failure reason |
@@ -67,7 +67,7 @@ users 1 ──< analyses 1 ──< agent_runs        (cascade-delete from analys
 ```python
 FindingType = Literal["positive", "negative", "warning", "neutral"]
 ChangeType  = FindingType
-Verdict     = Literal["INVEST", "WATCH", "PASS", "ACQUIRE"]
+Verdict     = Literal["INVEST", "WATCH", "REJECT", "ACQUIRE"]
 AnalysisStatus = Literal["queued", "running", "completed", "failed"]
 ```
 

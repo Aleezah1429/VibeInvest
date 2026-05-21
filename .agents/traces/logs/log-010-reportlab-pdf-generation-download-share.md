@@ -42,4 +42,4 @@ VibeInvest is an instant investor-grade due diligence app, which requires a form
 - Users can click **PDF** to trigger an in-app overlay displaying the multi-page ReportLab compiled report with the verdict badge, dimension breakdowns, key metrics, and agent briefs.
 - Users can click **Share** to copy the PDF link directly to their clipboard (on Web) or share it natively across contacts (on iOS/Android).
 - Collapsible cards inside Deliverables section are kept clean and minimal.
-- Verdict labels of `PASS` correctly render visually as **"REJECTED"** inside the red VC stamp and red PDF badge.
+- Verdict labels of `REJECT` correctly render visually as **"REJECTED"** inside the red VC stamp and red PDF badge.

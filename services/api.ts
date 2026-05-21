@@ -58,6 +58,18 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Legacy: the verdict 'PASS' was renamed to 'REJECT'. Old DB rows still carry
+// the old string; normalize at the boundary so screens never see 'PASS'.
+function normalizeVerdict<V extends string | null | undefined>(v: V): V {
+  return (v === 'PASS' ? 'REJECT' : v) as V;
+}
+
+function normalizeAnalysis(a: AnalysisDetail): AnalysisDetail {
+  a.verdict = normalizeVerdict(a.verdict);
+  if (a.report) a.report.verdict = normalizeVerdict(a.report.verdict);
+  return a;
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
@@ -116,17 +128,19 @@ export function createAnalysis(
       }
       throw new Error(`HTTP ${res.status} ${res.statusText}: ${detail}`);
     }
-    return res.json() as Promise<AnalysisDetail>;
+    return (res.json() as Promise<AnalysisDetail>).then(normalizeAnalysis);
   });
 }
 
 
 export function getAnalysis(id: string): Promise<AnalysisDetail> {
-  return http<AnalysisDetail>(`/api/analyses/${id}`);
+  return http<AnalysisDetail>(`/api/analyses/${id}`).then(normalizeAnalysis);
 }
 
 export function listAnalyses(limit = 10): Promise<AnalysisSummary[]> {
-  return http<AnalysisSummary[]>(`/api/analyses?limit=${limit}`);
+  return http<AnalysisSummary[]>(`/api/analyses?limit=${limit}`).then((items) =>
+    items.map((it) => ({ ...it, verdict: normalizeVerdict(it.verdict) })),
+  );
 }
 
 export type DashboardVerdict =
@@ -147,7 +161,9 @@ export interface RecentAnalysisItem {
 }
 
 export function getRecentAnalyses(limit = 10): Promise<RecentAnalysisItem[]> {
-  return http<RecentAnalysisItem[]>(`/api/analyses/recent?limit=${limit}`);
+  return http<RecentAnalysisItem[]>(`/api/analyses/recent?limit=${limit}`).then((items) =>
+    items.map((it) => ({ ...it, verdict: normalizeVerdict(it.verdict) })),
+  );
 }
 
 export interface PollOptions {

@@ -127,7 +127,7 @@ analyses(
   context         TEXT,
   status          TEXT NOT NULL,           -- queued | running | completed | failed
   score           INTEGER,                 -- final Aura score, null until done
-  verdict         TEXT,                    -- INVEST | WATCH | PASS | ACQUIRE
+  verdict         TEXT,                    -- INVEST | WATCH | REJECT | ACQUIRE
   verdict_sub     TEXT,                    -- e.g. "WITH CONDITIONS"
   report_json     TEXT,                    -- full ReportData blob (denormalized)
   error           TEXT,                    -- populated if status=failed
@@ -227,7 +227,7 @@ Each agent is a function: `(input: AgentInput) -> AgentOutput`. The orchestrator
 
 ### Agent 4 — CVO (synthesizer)
 - **Tools**: none.
-- **Job**: read all three prior agent outputs, compute the final **Aura Score (0–1000)**, pick a verdict (`INVEST` / `WATCH` / `PASS` / `ACQUIRE`), score "Strategy" dimension, write the final summary. Build the `ReportData` blob.
+- **Job**: read all three prior agent outputs, compute the final **Aura Score (0–1000)**, pick a verdict (`INVEST` / `WATCH` / `REJECT` / `ACQUIRE`), score "Strategy" dimension, write the final summary. Build the `ReportData` blob.
 - **Output**: full `ReportData`, persisted to `analyses.report_json` and emitted as `pipeline_complete`.
 
 Scoring formula (starting point — tune later):
