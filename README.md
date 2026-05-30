@@ -4,6 +4,9 @@
 
 VibeInvest is an Expo (Android/web) + FastAPI application powered by a four-agent pipeline. A user enters a startup name (optionally with a pitch-deck PDF, sector, stage, funding hint, and free-form context); four AI agents — **The Skeptic**, **The Munshi**, **The Hype**, and **The CVO** — run sequentially, share evidence, and synthesise a single **Aura Score (0–1000)** and a verdict of `INVEST · WATCH · REJECT · ACQUIRE`. The full report is persisted and exportable as a styled PDF.
 
+# APK
+https://expo.dev/accounts/aleezah1429/projects/VibeInvestApp/builds/8a3b8f9c-9392-417d-9e29-22dc8c580a34 
+
 ---
 
 ## 1. Overview
