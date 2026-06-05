@@ -1,4 +1,3 @@
-import os
 import hashlib
 import secrets
 import hmac
@@ -10,10 +9,10 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from ..auth import User, UserSignUp, UserSignIn
+from ..config import SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES
 
-# JWT-like signature configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "vibeinvest-super-secure-hmac-jwt-key-2026")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440")) # 24 Hours
+# JWT-like signature configuration (SECRET_KEY / expiry resolved in config.py,
+# which also warns when SECRET_KEY falls back to the insecure default — ERR-002).
 
 def hash_password(password: str) -> str:
     """Hash a password using PBKDF2 with SHA-256 and a secure unique salt."""

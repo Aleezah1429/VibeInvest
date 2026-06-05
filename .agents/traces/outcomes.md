@@ -38,8 +38,9 @@
 | PostgreSQL persistence | `backend/app/db.py` | ✅ Functional |
 | Railway deployment (public HTTPS) | `DEPLOY.md`, Railway | ✅ Live |
 | EAS / APK build config | `eas.json` | ✅ Configured |
-| Native session persistence | `AuthContext.tsx` | ⬜ Missing |
-| Automated tests | — | ⬜ Missing |
+| Native session persistence | `AuthContext.tsx` (AsyncStorage) | ✅ Functional (log-016) |
+| Automated tests | `backend/tests/` + CI | ✅ scoring.py covered (log-016) |
+| Env-driven CORS + SECRET_KEY warning | `config.py`, `main.py` | ✅ Hardened (log-016) |
 
 **Live backend**: `https://vibeinvest-production.up.railway.app` — `/health` 200, auth + DB verified.
 

@@ -73,7 +73,7 @@ export default function RootLayout() {
                 <Animated.View style={[styles.splashContainer, { opacity }]}>
                   <SafeAreaView style={styles.safeArea}>
                     <Image
-                      source={require('../assets/images/vibeinevst-logo.gif')}
+                      source={require('../assets/images/vibeinvest-logo.gif')}
                       style={styles.splashImage}
                       resizeMode="contain"
                     />

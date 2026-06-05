@@ -1124,19 +1124,21 @@ function HamburgerMenu({
 // ─── main screen ───────────────────────────────────────────────────────────
 export default function DashboardScreen() {
   const router = useRouter();
-  const { isAuthenticated, user, signOut } = useAuth();
+  const { isAuthenticated, isBootstrapping, user, signOut } = useAuth();
   const { reports, latestReport } = useReports();
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    // Wait for native session hydration before redirecting, or a logged-in
+    // user gets bounced to /auth on cold start (ERR-006).
+    if (!isBootstrapping && !isAuthenticated) {
       const timer = setTimeout(() => router.replace('/auth'), 0);
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isBootstrapping, router]);
 
-  if (!isAuthenticated) {
+  if (isBootstrapping || !isAuthenticated) {
     return null;
   }
 

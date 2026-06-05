@@ -273,7 +273,12 @@ function AgentCard({
   const meta = AGENT_META[agentId] ?? AGENT_META[1];
   return (
     <View style={s.agentCardOuter}>
-      <TouchableOpacity onPress={onToggle} activeOpacity={0.85}>
+      <TouchableOpacity
+        onPress={onToggle}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+      >
         <LinearGradient
           colors={
             expanded
@@ -349,7 +354,12 @@ function DeliverableItem({
   const Icon = item.icon;
   return (
     <View style={s.delivOuter}>
-      <TouchableOpacity onPress={onToggle} activeOpacity={0.85}>
+      <TouchableOpacity
+        onPress={onToggle}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+      >
         <LinearGradient
           colors={['rgba(255,255,255,0.045)', 'rgba(255,255,255,0.012)']}
           start={{ x: 0, y: 0 }}

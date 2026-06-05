@@ -23,7 +23,22 @@
 | ERR-021 | `frontend/` dead Next.js dir | Deleted |
 | ERR-024 | `.temp/` prototype files | Deleted |
 
-`ERR-002` (no SSE library) and `ERR-019` are **not bugs** — the poll-based pipeline is a deliberate design choice (see `reasoning.md` Decision 2).
+### ✅ Resolved 2026-05-31 (log-016)
+
+| ID | Issue | Resolution |
+|----|-------|------------|
+| ERR-002 | `SECRET_KEY` could fall back to default | Centralized in `config.py`; logs a warning when the built-in default is used. **Still must set a stable `SECRET_KEY` Railway var.** |
+| ERR-003 | CORS wide open (`["*"]`) | `main.py` reads `ALLOWED_ORIGINS` env (defaults to local dev + Railway); `"*"` still allowed explicitly |
+| ERR-006 | Native session not persisted | AsyncStorage persistence + `isBootstrapping` gate in `AuthContext.tsx`; gates in `index.tsx`/`search.tsx` wait for hydration |
+| ERR-009 | Missing `accessibilityLabel`s | Already broadly covered since the trace; added `accessibilityState={{ expanded }}` to report expandable cards |
+| ERR-010 | No automated tests | `backend/tests/test_scoring.py` (19 tests) + `pytest.ini` + `requirements-dev.txt`; CI in `.github/workflows/backend-tests.yml` |
+| ERR-011 | `vibeinevst-logo.gif` typo | Renamed to `vibeinvest-logo.gif`; `_layout.tsx` require updated |
+| ERR-012 | Empty `google-adk-agent/` dir | Already removed |
+
+> Note: the old SSE/poll note below predates the ERR-002 reuse — the current
+> ERR-002 is the `SECRET_KEY` item above.
+
+`ERR-019` is **not a bug** — the poll-based pipeline is a deliberate design choice (see `reasoning.md` Decision 2).
 
 ---
 

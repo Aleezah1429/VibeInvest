@@ -1,18 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .config import ALLOWED_ORIGINS
 from .db import init_db
 from .routes.analyses import router as analyses_router
 from .routes.auth import router as auth_router
 
 app = FastAPI(title="VibeInvest API", version="0.1.0")
 
+# CORS is driven by the ALLOWED_ORIGINS env var (ERR-003) so production can be
+# locked to the real frontend origins. A literal "*" still allows everything.
+_allow_all = ALLOWED_ORIGINS == ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=False,
+    allow_credentials=not _allow_all,
 )
 
 

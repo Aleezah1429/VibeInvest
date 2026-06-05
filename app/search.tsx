@@ -27,17 +27,18 @@ function timeAgo(iso: string): string {
 
 export default function SearchScreen() {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isBootstrapping } = useAuth();
   const toast = useToast();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    // Wait for native session hydration before redirecting (ERR-006).
+    if (!isBootstrapping && !isAuthenticated) {
       const timer = setTimeout(() => {
         router.replace('/auth');
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isBootstrapping]);
 
   const [intent, setIntent] = useState('Invest');
   const [startupName, setStartupName] = useState('');
@@ -113,8 +114,8 @@ export default function SearchScreen() {
     };
   }, []);
 
-  if (!isAuthenticated) {
-    return null; // Don't render dashboard while redirecting to Auth
+  if (isBootstrapping || !isAuthenticated) {
+    return null; // Don't render dashboard while hydrating or redirecting to Auth
   }
 
   const handleAnalyze = async () => {

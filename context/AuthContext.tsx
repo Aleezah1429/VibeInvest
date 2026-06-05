@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import {
   apiSignIn,
@@ -20,6 +21,10 @@ interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   isLoading: boolean;
+  // True only on native while the persisted session is being read from
+  // AsyncStorage on cold start. Auth gates should wait on this before
+  // redirecting to /auth so a logged-in user isn't bounced out (ERR-006).
+  isBootstrapping: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -30,8 +35,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Web-only persistence using localStorage. No AsyncStorage/SecureStore is installed,
-// so native cold-starts remain unauthenticated until one of those is added.
+// Session persistence. Web uses localStorage synchronously (so the very first
+// render is already authenticated, no flash). Native (iOS/Android/APK) has no
+// localStorage, so it persists to AsyncStorage and hydrates asynchronously on
+// cold start — see the bootstrap effect below (ERR-006).
 const STORAGE_KEY = 'vibe.auth.session';
 
 interface PersistedSession {
@@ -42,11 +49,9 @@ interface PersistedSession {
 const hasLocalStorage =
   Platform.OS === 'web' && typeof globalThis !== 'undefined' && typeof (globalThis as any).localStorage !== 'undefined';
 
-function loadSession(): PersistedSession | null {
-  if (!hasLocalStorage) return null;
+function parseSession(raw: string | null): PersistedSession | null {
+  if (!raw) return null;
   try {
-    const raw = (globalThis as any).localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.user?.email || !parsed?.token) return null;
     return parsed as PersistedSession;
@@ -55,14 +60,38 @@ function loadSession(): PersistedSession | null {
   }
 }
 
-function saveSession(session: PersistedSession | null) {
-  if (!hasLocalStorage) return;
+// Synchronous web-only read, used to seed the initial render on web.
+function loadSession(): PersistedSession | null {
+  if (!hasLocalStorage) return null;
+  return parseSession((globalThis as any).localStorage.getItem(STORAGE_KEY));
+}
+
+// Async read used on native cold start.
+async function loadSessionAsync(): Promise<PersistedSession | null> {
+  if (hasLocalStorage) return loadSession();
   try {
-    const ls = (globalThis as any).localStorage;
-    if (session) ls.setItem(STORAGE_KEY, JSON.stringify(session));
-    else ls.removeItem(STORAGE_KEY);
+    return parseSession(await AsyncStorage.getItem(STORAGE_KEY));
   } catch {
-    // private-mode / quota — ignore
+    return null;
+  }
+}
+
+function saveSession(session: PersistedSession | null) {
+  if (hasLocalStorage) {
+    try {
+      const ls = (globalThis as any).localStorage;
+      if (session) ls.setItem(STORAGE_KEY, JSON.stringify(session));
+      else ls.removeItem(STORAGE_KEY);
+    } catch {
+      // private-mode / quota — ignore
+    }
+    return;
+  }
+  // Native: AsyncStorage is async; fire-and-forget so callers stay synchronous.
+  if (session) {
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(session)).catch(() => {});
+  } else {
+    AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
   }
 }
 
@@ -71,15 +100,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!initial);
   const [user, setUser] = useState<User | null>(initial?.user ?? null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  // Web is seeded synchronously above, so it's never bootstrapping. Native has
+  // to read AsyncStorage first, so it starts true until hydration completes.
+  const [isBootstrapping, setIsBootstrapping] = useState<boolean>(!hasLocalStorage);
+  // The token persisted on native, surfaced so profile edits can re-save it
+  // without re-reading AsyncStorage (web reads it back from localStorage).
+  const [sessionToken, setSessionToken] = useState<string | null>(initial?.token ?? null);
 
-  // Keep profile edits persisted across refresh on web.
+  // Keep profile edits persisted across refresh/restart.
   useEffect(() => {
-    if (!hasLocalStorage || !isAuthenticated || !user) return;
-    const current = loadSession();
-    if (current && current.user.email === user.email) {
-      saveSession({ user, token: current.token });
+    if (!isAuthenticated || !user) return;
+    if (hasLocalStorage) {
+      const current = loadSession();
+      if (current && current.user.email === user.email) {
+        saveSession({ user, token: current.token });
+      }
+    } else if (sessionToken) {
+      saveSession({ user, token: sessionToken });
     }
-  }, [user, isAuthenticated]);
+  }, [user, isAuthenticated, sessionToken]);
+
+  // Native cold-start: hydrate the persisted session from AsyncStorage, push the
+  // token to the request layer, then clear the bootstrapping flag (ERR-006).
+  useEffect(() => {
+    if (hasLocalStorage) return; // web already seeded synchronously
+    let cancelled = false;
+    (async () => {
+      const persisted = await loadSessionAsync();
+      if (cancelled) return;
+      if (persisted) {
+        setAuthToken(persisted.token);
+        setSessionToken(persisted.token);
+        setUser(persisted.user);
+        setIsAuthenticated(true);
+      }
+      setIsBootstrapping(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // If any API call returns 401 (token expired / revoked), force sign-out so
   // the gates in /index.tsx and /search.tsx redirect to /auth on the next render.
@@ -91,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUnauthorizedHandler(() => {
       saveSession(null);
       setAuthToken(null);
+      setSessionToken(null);
       setIsAuthenticated(false);
       setUser(null);
     });
@@ -150,6 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const nextUser = { name: res.user.name, email: res.user.email };
       saveSession({ user: nextUser, token: res.access_token });
       setAuthToken(res.access_token);
+      setSessionToken(res.access_token);
       setIsAuthenticated(true);
       setUser(nextUser);
       setIsLoading(false);
@@ -170,6 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const nextUser = { name: res.user.name, email: res.user.email };
       saveSession({ user: nextUser, token: res.access_token });
       setAuthToken(res.access_token);
+      setSessionToken(res.access_token);
       setIsAuthenticated(true);
       setUser(nextUser);
       setIsLoading(false);
@@ -198,6 +261,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const nextUser = { name: res.user.name, email: res.user.email };
       saveSession({ user: nextUser, token: res.access_token });
       setAuthToken(res.access_token);
+      setSessionToken(res.access_token);
       setIsAuthenticated(true);
       setUser(nextUser);
       setIsLoading(false);
@@ -213,6 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await triggerHaptic('light');
     saveSession(null);
     setAuthToken(null);
+    setSessionToken(null);
     setIsAuthenticated(false);
     setUser(null);
   };
@@ -248,6 +313,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated,
         user,
         isLoading,
+        isBootstrapping,
         signIn,
         signUp,
         signInWithGoogle,
