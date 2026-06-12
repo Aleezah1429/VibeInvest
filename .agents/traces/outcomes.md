@@ -11,9 +11,11 @@
 > The 2026-05-17 trace called VibeInvest "a visually exceptional demo shell —
 > 0% connected to the backend." That is no longer true. It is now an
 > **end-to-end functional product**: a real FastAPI backend with a 4-agent
-> pipeline, user auth, server-side PDF, and PostgreSQL persistence, **deployed
-> to Railway** and wired to the Expo app. Remaining work is hardening, native
-> session persistence, and test coverage.
+> pipeline, user auth, server-side PDF, and PostgreSQL persistence, wired to the
+> Expo app. Hosting moved off paid Railway to a **free, no-card stack: Back4App
+> Containers (Docker from GitHub) + Neon Postgres** (Neon live; backend verified
+> locally against Neon, Back4App deploy in progress). Remaining work is finishing
+> the deploy + APK build.
 
 ---
 
@@ -36,13 +38,14 @@
 | Glassmorphic toast notifications | `ToastContext.tsx` | ✅ Polished |
 | Web session persistence | `AuthContext.tsx` | ✅ Functional |
 | PostgreSQL persistence | `backend/app/db.py` | ✅ Functional |
-| Railway deployment (public HTTPS) | `DEPLOY.md`, Railway | ✅ Live |
+| Neon Postgres (free, persistent) | Neon | ✅ Live |
+| Backend hosting (Back4App, free/no-card) | `DEPLOY_BACK4APP.md` | 🟡 Deploy in progress |
 | EAS / APK build config | `eas.json` | ✅ Configured |
 | Native session persistence | `AuthContext.tsx` (AsyncStorage) | ✅ Functional (log-016) |
 | Automated tests | `backend/tests/` + CI | ✅ scoring.py covered (log-016) |
 | Env-driven CORS + SECRET_KEY warning | `config.py`, `main.py` | ✅ Hardened (log-016) |
 
-**Live backend**: `https://vibeinvest-production.up.railway.app` — `/health` 200, auth + DB verified.
+**Backend**: verified locally against Neon — `/health` 200, signup → 201 with token (DB writes work). Hosting target: **Back4App Containers** (free, no card) — Railway/Render/Koyeb dropped (cost or card), Hugging Face dropped (auto-flagged generic API backends).
 
 ---
 
@@ -53,7 +56,7 @@
 | Visual design | A+ | Exceptional dark theme, animations, agent personality |
 | Navigation | A | 10-screen flow with auth gates, clean `replace`/`push` use |
 | Backend & API | A− | Real pipeline, deployed; poll-based; hardening pending |
-| Deployment | A− | Railway + managed Postgres; EAS profiles set |
+| Deployment | B+ | Neon Postgres live; Back4App (free/no-card) deploy in progress; EAS profiles set |
 | Error handling | B | Toast system + poll fail-safes; backend `detail` surfaced |
 | Type safety | B− | `services/types.ts` mirrors `schemas.py`; some `any` remain |
 | Auth & security | B− | Real auth works; CORS `*`, `SECRET_KEY` stability to fix |
@@ -84,15 +87,19 @@ Net trajectory since 05-17: **API integration F → A−**, **error handling F �
 
 ## Recommended Next Actions (priority order)
 
-### Immediate (before sharing the deployment)
-1. Confirm `CLAUDE_API_KEY` / `GOOGLE_API_KEY` / `TAVILY_API_KEY` are set as **Railway** variables — the pipeline fails server-side without them (ERR-001).
-2. Set a stable `SECRET_KEY` Railway variable so tokens survive redeploys (ERR-002).
-3. Narrow CORS `allow_origins` from `["*"]` to the real frontend domain(s) (ERR-003).
+### Immediate (finish the deploy)
+1. Push `backend/Dockerfile` to GitHub `main` (Back4App builds from the repo).
+2. Deploy on **Back4App Containers** (root dir `backend`, port `7860`) and set env vars: `DATABASE_URL` (Neon), `SECRET_KEY`, `CLAUDE_API_KEY`, `TAVILY_API_KEY`, `GOOGLE_API_KEY`, `ALLOWED_ORIGINS` (ERR-001/002/003 all handled in `config.py`/`main.py` + dashboard env).
+3. Wire the live `*.b4a.run` URL into `.env` + `eas.json`, then `eas build -p android --profile preview` for the APK.
 
 ### Short-term (product completeness)
-4. Install `@react-native-async-storage/async-storage` and persist the session on native (ERR-006).
-5. Wire up Alembic migrations — `create_all` is add-only (ERR-004).
-6. Update `README.md` / `ROADMAP.md` / `FEATURES.md` / `PHASES.md` to the shipped Expo + FastAPI architecture (ERR-013).
+4. Wire up Alembic migrations — `create_all` is add-only (ERR-004).
+5. Watch Back4App memory (256 MB) — if OOM, drop the unused `google-generativeai` from `requirements.txt`.
+6. Update `ROADMAP.md` / `FEATURES.md` / `PHASES.md` to the shipped Expo + FastAPI + Back4App/Neon architecture (ERR-013; README already done).
+
+> Done in log-016: native session persistence (ERR-006), tests + CI (ERR-010),
+> a11y pass (ERR-009), logo typo (ERR-011), empty dir (ERR-012), SECRET_KEY
+> warning + env CORS (ERR-002/003).
 
 ### Medium-term (quality)
 7. Extract components from `index.tsx` / `report.tsx` / `loading.tsx` (ERR-007).
@@ -105,4 +112,4 @@ Net trajectory since 05-17: **API integration F → A−**, **error handling F �
 
 ## Summary
 
-VibeInvest has gone from a UI prototype to a deployed, full-stack product in the four days since the last trace: a FastAPI 4-agent backend on Railway, PostgreSQL persistence, real auth, server-side PDF, and a polished Expo client wired to all of it. The critical path to launch is now **operational hardening** — Railway env vars, a stable signing key, and tightened CORS — not feature work. The largest standing engineering debt is screen-file size and the complete absence of tests.
+VibeInvest is a full-stack product: a FastAPI 4-agent backend, Postgres persistence, real auth, server-side PDF, and a polished Expo client wired to all of it. Backend hardening, native session persistence, and the first tests + CI are done (log-016). Hosting was moved off paid Railway to a **free, no-card stack — Back4App Containers + Neon Postgres** — after Render/Koyeb (card walls) and Hugging Face (abuse auto-flag) were ruled out; the backend is verified working locally against Neon and the Back4App deploy is the final step before the APK build. The largest standing engineering debt is screen-file size.

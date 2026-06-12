@@ -27,8 +27,8 @@
 
 | ID | Issue | Resolution |
 |----|-------|------------|
-| ERR-002 | `SECRET_KEY` could fall back to default | Centralized in `config.py`; logs a warning when the built-in default is used. **Still must set a stable `SECRET_KEY` Railway var.** |
-| ERR-003 | CORS wide open (`["*"]`) | `main.py` reads `ALLOWED_ORIGINS` env (defaults to local dev + Railway); `"*"` still allowed explicitly |
+| ERR-002 | `SECRET_KEY` could fall back to default | Centralized in `config.py`; logs a warning when the built-in default is used. **Still set a stable `SECRET_KEY` env var on the host (Back4App).** |
+| ERR-003 | CORS wide open (`["*"]`) | `main.py` reads `ALLOWED_ORIGINS` env; `"*"` still allowed explicitly |
 | ERR-006 | Native session not persisted | AsyncStorage persistence + `isBootstrapping` gate in `AuthContext.tsx`; gates in `index.tsx`/`search.tsx` wait for hydration |
 | ERR-009 | Missing `accessibilityLabel`s | Already broadly covered since the trace; added `accessibilityState={{ expanded }}` to report expandable cards |
 | ERR-010 | No automated tests | `backend/tests/test_scoring.py` (19 tests) + `pytest.ini` + `requirements-dev.txt`; CI in `.github/workflows/backend-tests.yml` |
@@ -44,15 +44,15 @@
 
 ## 🔴 Critical — Pre-Launch Blockers
 
-### ERR-001: LLM keys must be set as Railway env vars
-- **Location**: Railway backend service → Variables
-- **Risk**: The agent pipeline calls Claude / Gemini / Tavily server-side. If `CLAUDE_API_KEY`, `GOOGLE_API_KEY`, or `TAVILY_API_KEY` are unset on Railway, every analysis fails server-side even though the app and DB look healthy.
-- **Fix**: Confirm all four keys (`GOOGLE_API_KEY`, `OPENAI_API_KEY`, `CLAUDE_API_KEY`, `TAVILY_API_KEY`) are present in Railway Variables. Local `.env` does **not** propagate to Railway.
+### ERR-001: LLM keys must be set as host (Back4App) env vars
+- **Location**: Back4App container → Environment Variables
+- **Risk**: The agent pipeline calls Claude / Tavily / Google server-side. If `CLAUDE_API_KEY`, `GOOGLE_API_KEY`, or `TAVILY_API_KEY` are unset on the host, every analysis fails server-side even though the app and DB look healthy.
+- **Fix**: Set `DATABASE_URL`, `SECRET_KEY`, `CLAUDE_API_KEY`, `TAVILY_API_KEY`, `GOOGLE_API_KEY`, `ALLOWED_ORIGINS` in the Back4App dashboard. Local `.env` does **not** propagate to the host.
 
 ### ERR-002: `SECRET_KEY` must be stable across deploys
-- **Location**: `backend/app/auth.py` (token signing) / Railway Variables
-- **Risk**: HMAC tokens are signed with `SECRET_KEY`. If it falls back to the hardcoded default or changes between deploys, every existing session token silently becomes invalid.
-- **Fix**: Set a fixed `SECRET_KEY` Railway variable (`python -c "import secrets; print(secrets.token_hex(32))"`).
+- **Location**: `backend/app/config.py` (resolves `SECRET_KEY`, warns on default) / Back4App env
+- **Status**: Code-side handled in log-016 (warning on default). **Still set a fixed `SECRET_KEY` env var on the host** so tokens survive redeploys.
+- **Fix**: Generate once (`python -c "import secrets; print(secrets.token_hex(32))"`) and set it as a Back4App env var.
 
 ---
 
@@ -61,7 +61,7 @@
 ### ERR-003: CORS is wide open
 - **Location**: `backend/app/main.py:10-16` — `allow_origins=["*"]`
 - **Risk**: Fine while iterating; unsafe once the URL is public.
-- **Fix**: Narrow `allow_origins` to the real frontend domain(s) before public launch (`DEPLOY.md §9`).
+- **Fix**: Handled in log-016 — `main.py` reads `ALLOWED_ORIGINS` env; set it to the real frontend origin(s) on the host before public launch (`DEPLOY_BACK4APP.md`).
 
 ### ERR-004: No schema migration path
 - **Location**: `backend/app/db.py` — `init_db()` uses `Base.metadata.create_all()`
@@ -71,7 +71,7 @@
 ### ERR-005: Real secrets sit in the working-tree `.env`
 - **Location**: `.env` (project root)
 - **Status**: Gitignored and never committed ✅ — but the file holds live `GOOGLE`/`OPENAI`/`CLAUDE`/`TAVILY` keys in plaintext.
-- **Fix**: Treat as live secrets — don't paste the file into chats/screenshots; rotate any key that has been shared. Railway Variables are the production source of truth.
+- **Fix**: Treat as live secrets — don't paste the file into chats/screenshots; rotate any key that has been shared (also the Neon DB password). The host's (Back4App) env vars are the production source of truth.
 
 ### ERR-006: Native session persistence missing
 - **Location**: `context/AuthContext.tsx`

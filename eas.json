@@ -8,7 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://REPLACE-WITH-KOYEB-URL.koyeb.app"
+        "EXPO_PUBLIC_API_BASE_URL": "https://REPLACE-WITH-BACK4APP-URL.b4a.run"
       }
     },
     "preview": {
@@ -17,13 +17,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://REPLACE-WITH-KOYEB-URL.koyeb.app"
+        "EXPO_PUBLIC_API_BASE_URL": "https://REPLACE-WITH-BACK4APP-URL.b4a.run"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://REPLACE-WITH-KOYEB-URL.koyeb.app"
+        "EXPO_PUBLIC_API_BASE_URL": "https://REPLACE-WITH-BACK4APP-URL.b4a.run"
       }
     }
   },
