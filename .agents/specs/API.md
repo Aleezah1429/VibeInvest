@@ -1,6 +1,6 @@
 # API Reference
 
-All endpoints live on the FastAPI backend ([backend/app/main.py](../../backend/app/main.py)). Base URL: `http://127.0.0.1:8000` in dev, the Back4App `*.b4a.run` domain in prod. Content-Type: `application/json` unless noted. Authenticated endpoints need `Authorization: Bearer <token>`. CORS: `ALLOWED_ORIGINS` env (defaults to `*`).
+All endpoints live on the FastAPI backend ([backend/app/main.py](../../backend/app/main.py)). Base URL: `http://127.0.0.1:8000` in dev, the Railway domain in prod. Content-Type: `application/json` unless noted. Authenticated endpoints need `Authorization: Bearer <token>`. CORS: `ALLOWED_ORIGINS` env (defaults to `*`).
 
 ---
 
@@ -68,7 +68,7 @@ Creates an `analyses` row (`status="queued"`), saves the PDF if provided, schedu
 
 ## Health
 
-`GET /health` → `{"status":"ok"}`. Used as the host's healthcheck (Back4App).
+`GET /health` → `{"status":"ok"}`. Used as Railway's healthcheck.
 
 ---
 

@@ -60,7 +60,7 @@ Investors, acquirers, and VCs normally spend hours per deal reading decks, hunti
                               │  ─ api.anthropic.com      │ (Claude Sonnet 4.5 / Opus 4.5)
                               │  ─ api.tavily.com/search  │ (web search)
                               │  ─ oauth2.googleapis.com  │ (Google ID-token verification)
-                              │  ─ Neon Postgres          │ (managed DB in prod)
+                              │  ─ Railway Postgres       │ (managed DB in prod)
                               └──────────────────────────┘
 ```
 
@@ -96,7 +96,7 @@ We use three real external APIs. **Nothing is mocked in normal operation** — e
 | **Tavily HTTP** | Backend → Tavily. Search results are saved to `raw_evidence` so later agents (and users) can audit what the LLM saw. |
 | **Expo Document Picker** | Client → Backend. Lets the user attach a pitch-deck PDF; backend extracts the text with `pypdf` and stores it as evidence. |
 | **Expo Print + Sharing** | Client-side. Wired in for share-sheet flows on the report screen. |
-| **Neon Postgres** | Backend → Postgres in prod (free, persistent). SQLAlchemy normalises the legacy `postgres://` scheme and enables connection pooling. |
+| **Railway Postgres** | Backend → Postgres in prod. SQLAlchemy normalises the legacy `postgres://` scheme and enables connection pooling. |
 
 ---
 
@@ -121,7 +121,7 @@ An analysis owns its agent runs and evidence (cascade-delete). The full `ReportD
 
 **Backend** — FastAPI ≥ 0.115, Uvicorn, SQLAlchemy 2.0, Pydantic 2.7, Anthropic SDK, httpx, pypdf, reportlab, python-multipart, python-dotenv, psycopg2-binary, alembic. Picked for async-native HTTP, free OpenAPI docs, and a clean SQLite → Postgres swap via the same code.
 
-**Hosting** — Back4App Containers (Docker from GitHub, free, no card) for the backend, Neon Postgres in prod (free, persistent), Expo EAS for native builds. See [backend/DEPLOY_BACK4APP.md](backend/DEPLOY_BACK4APP.md).
+**Hosting** — Railway (Procfile + Nixpacks builder), Railway Postgres in prod, Expo EAS for native builds. See [backend/DEPLOY.md](backend/DEPLOY.md).
 
 ---
 
@@ -186,7 +186,7 @@ cp backend/.env.example .env
 
 For the frontend to talk to a non-localhost backend:
 ```env
-EXPO_PUBLIC_API_BASE_URL=https://your-backend.b4a.run
+EXPO_PUBLIC_API_BASE_URL=https://your-backend.up.railway.app
 ```
 
 ### 3. Run
@@ -204,7 +204,7 @@ npm run lint
 ```
 
 ### 4. Production
-See [backend/DEPLOY_BACK4APP.md](backend/DEPLOY_BACK4APP.md) for the Back4App + Neon runbook (free, no credit card).
+See [backend/DEPLOY.md](backend/DEPLOY.md) for the Railway runbook.
 
 ---
 
@@ -222,7 +222,7 @@ A typical run takes **~40–90 s** end-to-end (four sequential Claude calls + ~6
 
 ## 12. Scalability
 
-The backend is a single FastAPI process today. To scale: run more Uvicorn workers, move the pipeline off `BackgroundTasks` onto a real worker (Celery/Arq + Redis), and run more stateless container replicas. The DB is already Postgres in prod (Neon), so the data layer scales independently.
+The backend is a single FastAPI process today. To scale: run more Uvicorn workers, move the pipeline off `BackgroundTasks` onto a real worker (Celery/Arq + Redis), and let Railway autoscale stateless replicas. The DB is already Postgres in prod, so the data layer scales independently.
 
 ### Known bottlenecks
 1. **In-process pipeline.** Each analysis holds one background task slot for ~60 s; concurrent runs queue up behind it.
