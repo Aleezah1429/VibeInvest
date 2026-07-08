@@ -7,6 +7,16 @@ VibeInvest is an Expo (Android/web) + FastAPI application powered by a four-agen
 # APK
 https://expo.dev/accounts/aleezah1429/projects/VibeInvestApp/builds/8a3b8f9c-9392-417d-9e29-22dc8c580a34 
 
+# Demo video
+
+A full walkthrough — sign-in, startup search, the four agents running, and the final Aura Score report:
+
+**▶️ [Watch the demo](https://github.com/Aleezah1429/VibeInvest/raw/main/assets/videos/demo.mp4)** (13 MB, MP4)
+
+<video src="https://github.com/Aleezah1429/VibeInvest/raw/main/assets/videos/demo.mp4" controls></video>
+
+> The video also lives in the repo at [`assets/videos/demo.mp4`](assets/videos/demo.mp4) if you'd rather play it locally.
+
 ---
 
 ## 1. Overview
